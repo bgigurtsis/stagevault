@@ -6,6 +6,7 @@ export interface User {
   name: string;
   email: string;
   profilePicture?: string;
+  role?: "performer" | "choreographer";
 }
 
 interface AuthContextType {
@@ -14,7 +15,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (name: string, email: string, password: string) => Promise<void>;
+  signup: (name: string, email: string, password: string, role?: "performer" | "choreographer") => Promise<void>;
   logout: () => void;
 }
 
@@ -24,19 +25,22 @@ const mockUsers: User[] = [
     id: "1",
     name: "Jane Doe",
     email: "jane@example.com",
-    profilePicture: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=250&q=80"
+    profilePicture: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=250&q=80",
+    role: "choreographer"
   },
   {
     id: "2",
     name: "John Smith",
     email: "john@example.com",
-    profilePicture: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=250&q=80"
+    profilePicture: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=250&q=80",
+    role: "performer"
   },
   {
     id: "3",
     name: "Sarah Johnson",
     email: "sarah@example.com",
-    profilePicture: "https://images.unsplash.com/photo-1580489944761-15a19d654956?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=250&q=80"
+    profilePicture: "https://images.unsplash.com/photo-1580489944761-15a19d654956?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=250&q=80",
+    role: "performer"
   }
 ];
 
@@ -97,7 +101,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setIsLoading(false);
   };
 
-  const signup = async (name: string, email: string, password: string) => {
+  const signup = async (name: string, email: string, password: string, role?: "performer" | "choreographer") => {
     // In a real app, you would make an API request to create a new user
     
     setIsLoading(true);
@@ -115,7 +119,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       name,
       email,
       // Default profile picture
-      profilePicture: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`
+      profilePicture: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`,
+      role: role || "performer" // Default to performer if no role is provided
     };
     
     // In a real app, you would add the user to the database
