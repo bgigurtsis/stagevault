@@ -9,7 +9,6 @@ import {
   Clock,
   Plus,
   Calendar,
-  Users
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,8 +20,7 @@ export default function Dashboard() {
   
   // Filter to only show recent items (in a real app, these would be sorted by date)
   const recentPerformances = mockPerformances.slice(0, 3);
-  const recentRehearsals = mockRehearsals.slice(0, 3);
-  const recentRecordings = mockRecordings.slice(0, 4);
+  const recentRecordings = mockRecordings.slice(0, 8); // Show more recordings since we removed rehearsals
   
   const totalPerformances = mockPerformances.length;
   const totalRehearsals = mockRehearsals.length;
@@ -227,7 +225,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {recentRecordings.map((recording) => (
               <Card key={recording.id} className="overflow-hidden">
                 <Link to={`/recordings/${recording.id}`} className="group">
@@ -258,93 +256,6 @@ export default function Dashboard() {
                 </Link>
               </Card>
             ))}
-          </div>
-        )}
-      </div>
-      
-      {/* Upcoming rehearsals */}
-      <div>
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Upcoming Rehearsals</h2>
-          <Link to="/rehearsals" className="text-sm text-primary flex items-center hover:underline">
-            <span>View all</span>
-            <ArrowRight className="ml-1 h-4 w-4" />
-          </Link>
-        </div>
-        
-        {recentRehearsals.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="rounded-full bg-muted p-3 mb-4">
-                <PlaySquare className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-semibold">No upcoming rehearsals</h3>
-              <p className="text-muted-foreground mt-1 mb-4 max-w-md">
-                Schedule your first rehearsal
-              </p>
-              <Link to="/rehearsals/new">
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Rehearsal
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {recentRehearsals.map((rehearsal) => {
-              const relatedPerformance = mockPerformances.find(
-                (p) => p.id === rehearsal.performanceId
-              );
-              
-              return (
-                <Card key={rehearsal.id}>
-                  <CardContent className="p-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
-                      <div className="flex-shrink-0">
-                        <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                          <PlaySquare className="h-6 w-6 text-primary" />
-                        </div>
-                      </div>
-                      
-                      <div className="flex-grow">
-                        <Link to={`/rehearsals/${rehearsal.id}`} className="group">
-                          <h3 className="font-semibold text-lg group-hover:text-primary transition-colors">
-                            {rehearsal.title}
-                          </h3>
-                        </Link>
-                        {relatedPerformance && (
-                          <Link to={`/performances/${relatedPerformance.id}`} className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                            {relatedPerformance.title}
-                          </Link>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center gap-4 sm:gap-6 text-sm">
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <Calendar className="h-4 w-4" />
-                          <span>{formatDate(rehearsal.date)}</span>
-                        </div>
-                        
-                        {rehearsal.location && (
-                          <div className="flex items-center gap-1 text-muted-foreground">
-                            <PlaySquare className="h-4 w-4" />
-                            <span>{rehearsal.location}</span>
-                          </div>
-                        )}
-                        
-                        {rehearsal.taggedUsers && (
-                          <div className="flex items-center gap-1 text-muted-foreground">
-                            <Users className="h-4 w-4" />
-                            <span>{rehearsal.taggedUsers.length}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
           </div>
         )}
       </div>
