@@ -3,28 +3,25 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { 
   Theater, 
-  PlaySquare, 
-  Video, 
   ArrowRight,
   Clock,
   Plus,
   Calendar,
+  Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { mockPerformances, mockRehearsals, mockRecordings } from "@/types";
 
 export default function Dashboard() {
   const { currentUser } = useAuth();
+  const [searchQuery, setSearchQuery] = useState("");
   
   // Filter to only show recent items (in a real app, these would be sorted by date)
   const recentPerformances = mockPerformances.slice(0, 3);
-  const recentRecordings = mockRecordings.slice(0, 8); // Show more recordings since we removed rehearsals
-  
-  const totalPerformances = mockPerformances.length;
-  const totalRehearsals = mockRehearsals.length;
-  const totalRecordings = mockRecordings.length;
+  const recentRecordings = mockRecordings.slice(0, 3); // Show same number as performances
   
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -55,74 +52,22 @@ export default function Dashboard() {
           </Link>
           <Link to="/record">
             <Button>
-              <Video className="mr-2 h-4 w-4" />
+              <Search className="mr-2 h-4 w-4" />
               Record New Video
             </Button>
           </Link>
         </div>
       </div>
       
-      {/* Stats overview */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Performances</p>
-                <p className="text-3xl font-bold">{totalPerformances}</p>
-              </div>
-              <div className="rounded-full bg-primary/10 p-2">
-                <Theater className="h-5 w-5 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-          <CardFooter className="border-t pt-4 pb-2">
-            <Link to="/performances" className="text-sm text-primary flex items-center hover:underline">
-              <span>View all performances</span>
-              <ArrowRight className="ml-1 h-4 w-4" />
-            </Link>
-          </CardFooter>
-        </Card>
-        
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Rehearsals</p>
-                <p className="text-3xl font-bold">{totalRehearsals}</p>
-              </div>
-              <div className="rounded-full bg-primary/10 p-2">
-                <PlaySquare className="h-5 w-5 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-          <CardFooter className="border-t pt-4 pb-2">
-            <Link to="/rehearsals" className="text-sm text-primary flex items-center hover:underline">
-              <span>View all rehearsals</span>
-              <ArrowRight className="ml-1 h-4 w-4" />
-            </Link>
-          </CardFooter>
-        </Card>
-        
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Recordings</p>
-                <p className="text-3xl font-bold">{totalRecordings}</p>
-              </div>
-              <div className="rounded-full bg-primary/10 p-2">
-                <Video className="h-5 w-5 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-          <CardFooter className="border-t pt-4 pb-2">
-            <Link to="/recordings" className="text-sm text-primary flex items-center hover:underline">
-              <span>View all recordings</span>
-              <ArrowRight className="ml-1 h-4 w-4" />
-            </Link>
-          </CardFooter>
-        </Card>
+      {/* Global Search Bar - replacing stats section */}
+      <div className="relative">
+        <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
+        <Input
+          placeholder="Search across performances, rehearsals, and recordings..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10 py-6 text-lg"
+        />
       </div>
       
       {/* Recent performances */}
@@ -196,7 +141,7 @@ export default function Dashboard() {
         )}
       </div>
       
-      {/* Recent recordings */}
+      {/* Recent recordings - updated to match performance card style */}
       <div>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold">Recent Recordings</h2>
@@ -210,7 +155,7 @@ export default function Dashboard() {
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12 text-center">
               <div className="rounded-full bg-muted p-3 mb-4">
-                <Video className="h-6 w-6 text-muted-foreground" />
+                <Search className="h-6 w-6 text-muted-foreground" />
               </div>
               <h3 className="text-lg font-semibold">No recordings yet</h3>
               <p className="text-muted-foreground mt-1 mb-4 max-w-md">
@@ -218,16 +163,16 @@ export default function Dashboard() {
               </p>
               <Link to="/record">
                 <Button>
-                  <Video className="mr-2 h-4 w-4" />
+                  <Search className="mr-2 h-4 w-4" />
                   Record Video
                 </Button>
               </Link>
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {recentRecordings.map((recording) => (
-              <Card key={recording.id} className="overflow-hidden">
+              <Card key={recording.id} className="flex flex-col overflow-hidden">
                 <Link to={`/recordings/${recording.id}`} className="group">
                   <div className="aspect-video bg-muted relative overflow-hidden">
                     {recording.thumbnailUrl ? (
@@ -238,7 +183,7 @@ export default function Dashboard() {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-muted">
-                        <Video className="h-8 w-8 text-muted-foreground/50" />
+                        <Search className="h-10 w-10 text-muted-foreground/50" />
                       </div>
                     )}
                     
@@ -247,13 +192,23 @@ export default function Dashboard() {
                       {formatTime(recording.duration)}
                     </div>
                   </div>
-                  <CardContent className="p-3">
-                    <h3 className="font-medium text-sm line-clamp-1">{recording.title}</h3>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {recording.createdAt ? formatDate(recording.createdAt) : "No date"}
-                    </p>
-                  </CardContent>
+                  <CardHeader className="p-4 pb-2">
+                    <CardTitle className="text-lg">{recording.title}</CardTitle>
+                    {recording.description && (
+                      <CardDescription className="line-clamp-2">
+                        {recording.description}
+                      </CardDescription>
+                    )}
+                  </CardHeader>
                 </Link>
+                <CardContent className="p-4 pt-0 mt-auto">
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <Calendar className="h-4 w-4 mr-1" />
+                    <span>
+                      {recording.createdAt ? formatDate(recording.createdAt) : "No date"}
+                    </span>
+                  </div>
+                </CardContent>
               </Card>
             ))}
           </div>

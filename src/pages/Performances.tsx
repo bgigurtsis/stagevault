@@ -11,12 +11,15 @@ import {
   Trash,
   Filter,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Users,
+  PlaySquare
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { mockPerformances } from "@/types";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { mockPerformances, mockRehearsals } from "@/types";
 import { 
   DropdownMenu,
   DropdownMenuContent, 
@@ -58,6 +61,11 @@ export default function Performances() {
       day: "numeric",
     });
   };
+  
+  // Count rehearsals for each performance
+  const getRehearsalCount = (performanceId: string) => {
+    return mockRehearsals.filter(rehearsal => rehearsal.performanceId === performanceId).length;
+  };
 
   return (
     <div className="container max-w-6xl py-6 space-y-6">
@@ -74,7 +82,7 @@ export default function Performances() {
         </Link>
       </div>
       
-      {/* Search and Filter - Copied from Rehearsals page */}
+      {/* Search and Filter */}
       <div className="flex flex-col md:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -163,6 +171,34 @@ export default function Performances() {
                     <p className="text-muted-foreground text-sm mb-3 line-clamp-2">
                       {performance.description}
                     </p>
+                  )}
+                  
+                  {/* Added rehearsal count */}
+                  <div className="flex items-center text-sm text-muted-foreground mb-3">
+                    <PlaySquare className="h-4 w-4 mr-1" />
+                    <span>{getRehearsalCount(performance.id)} rehearsals</span>
+                  </div>
+                  
+                  {/* Added performers list */}
+                  {performance.taggedUsers && performance.taggedUsers.length > 0 && (
+                    <div className="flex items-center text-sm">
+                      <Users className="h-4 w-4 mr-2 text-muted-foreground" />
+                      <div className="flex -space-x-2 overflow-hidden">
+                        {performance.taggedUsers.slice(0, 3).map((user, index) => (
+                          <Avatar key={index} className="h-6 w-6 border-2 border-background">
+                            <AvatarImage src={user.profilePicture} />
+                            <AvatarFallback className="text-[10px]">
+                              {user.name.split(" ").map(n => n[0]).join("")}
+                            </AvatarFallback>
+                          </Avatar>
+                        ))}
+                        {performance.taggedUsers.length > 3 && (
+                          <div className="flex items-center justify-center h-6 w-6 rounded-full bg-muted text-[10px] font-medium">
+                            +{performance.taggedUsers.length - 3}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </CardContent>
               </Link>

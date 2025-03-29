@@ -41,7 +41,7 @@ export default function Layout() {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
   
-  // Updated navigation items - removed Rehearsals and Recordings
+  // Navigation items - removed Rehearsals and Recordings
   const navItems = [
     { path: "/", icon: <Home className="h-5 w-5" />, label: "Dashboard" },
     { path: "/performances", icon: <Theater className="h-5 w-5" />, label: "Performances" },
