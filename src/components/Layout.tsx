@@ -4,14 +4,12 @@ import { Link, Outlet, useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import {
   Home,
-  Video,
   User,
   LogOut,
   Menu,
   X,
   Plus,
   Theater,
-  PlaySquare
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -43,11 +41,10 @@ export default function Layout() {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
   
+  // Updated navigation items - removed Rehearsals and Recordings
   const navItems = [
     { path: "/", icon: <Home className="h-5 w-5" />, label: "Dashboard" },
     { path: "/performances", icon: <Theater className="h-5 w-5" />, label: "Performances" },
-    { path: "/rehearsals", icon: <PlaySquare className="h-5 w-5" />, label: "Rehearsals" },
-    { path: "/recordings", icon: <Video className="h-5 w-5" />, label: "Recordings" },
     { path: "/profile", icon: <User className="h-5 w-5" />, label: "Profile" },
   ];
   
@@ -68,7 +65,7 @@ export default function Layout() {
         <div className="flex h-16 items-center px-4 border-b">
           <Link to="/" className="flex items-center gap-2">
             <div className="rounded-md bg-stage-purple p-1">
-              <Video className="h-6 w-6 text-white" />
+              <Theater className="h-6 w-6 text-white" />
             </div>
             <h1 className="text-xl font-bold">StageVault</h1>
           </Link>
@@ -126,7 +123,7 @@ export default function Layout() {
           </Button>
           <Link to="/" className="flex items-center gap-2">
             <div className="rounded-md bg-stage-purple p-1">
-              <Video className="h-5 w-5 text-white" />
+              <Theater className="h-5 w-5 text-white" />
             </div>
             <h1 className="text-lg font-bold">StageVault</h1>
           </Link>
@@ -145,7 +142,7 @@ export default function Layout() {
               <div className="flex h-16 items-center justify-between border-b px-4">
                 <Link to="/" className="flex items-center gap-2">
                   <div className="rounded-md bg-stage-purple p-1">
-                    <Video className="h-5 w-5 text-white" />
+                    <Theater className="h-5 w-5 text-white" />
                   </div>
                   <h1 className="text-lg font-bold">StageVault</h1>
                 </Link>
@@ -230,7 +227,7 @@ export default function Layout() {
         {/* Mobile bottom navigation */}
         <nav className="md:hidden border-t bg-background">
           <div className="flex justify-between">
-            {navItems.slice(0, 4).map((item) => (
+            {navItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}

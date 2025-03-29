@@ -8,12 +8,14 @@ import {
   Calendar, 
   MoreVertical,
   Edit,
-  Trash
+  Trash,
+  Filter,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { mockPerformances } from "@/types";
 import { 
   DropdownMenu,
@@ -21,16 +23,32 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 export default function Performances() {
   const [searchQuery, setSearchQuery] = useState("");
   const [performances, setPerformances] = useState(mockPerformances);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   
+  // Filter performances based on search query
   const filteredPerformances = performances.filter(
     (performance) => 
       performance.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       performance.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  
+  // Sort performances by date
+  const sortedPerformances = [...filteredPerformances].sort((a, b) => {
+    if (!a.startDate || !b.startDate) return 0;
+    const dateA = new Date(a.startDate).getTime();
+    const dateB = new Date(b.startDate).getTime();
+    return sortDirection === "asc" ? dateA - dateB : dateB - dateA;
+  });
+
+  const toggleSortDirection = () => {
+    setSortDirection(prev => prev === "asc" ? "desc" : "asc");
+  };
   
   const formatDate = (dateString?: string) => {
     if (!dateString) return "TBD";
@@ -48,27 +66,62 @@ export default function Performances() {
           <Theater className="h-8 w-8" />
           <span>Performances</span>
         </h1>
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search performances..."
-              className="pl-8"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          <Link to="/performances/new">
-            <Button className="whitespace-nowrap">
-              <Plus className="mr-2 h-4 w-4" />
-              New Performance
-            </Button>
-          </Link>
-        </div>
+        <Link to="/performances/new">
+          <Button className="whitespace-nowrap">
+            <Plus className="mr-2 h-4 w-4" />
+            New Performance
+          </Button>
+        </Link>
       </div>
       
-      {filteredPerformances.length === 0 ? (
+      {/* Search and Filter - Copied from Rehearsals page */}
+      <div className="flex flex-col md:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search performances..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 w-full"
+          />
+        </div>
+        
+        <Collapsible
+          open={isFilterOpen}
+          onOpenChange={setIsFilterOpen}
+          className="md:w-auto"
+        >
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1 md:flex-none" onClick={toggleSortDirection}>
+              Sort by Date {sortDirection === "asc" ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />}
+            </Button>
+            
+            <CollapsibleTrigger asChild>
+              <Button variant="outline" className="md:hidden">
+                <Filter className="h-4 w-4" />
+              </Button>
+            </CollapsibleTrigger>
+          </div>
+          
+          <CollapsibleContent className="mt-4 space-y-4 rounded-md border p-4 md:hidden">
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium">Date Range</h3>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="flex-1">
+                  <Calendar className="mr-2 h-4 w-4" />
+                  Start
+                </Button>
+                <Button variant="outline" size="sm" className="flex-1">
+                  <Calendar className="mr-2 h-4 w-4" />
+                  End
+                </Button>
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
+      
+      {sortedPerformances.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <div className="rounded-full bg-muted p-3 mb-4">
             <Theater className="h-6 w-6 text-muted-foreground" />
@@ -88,7 +141,7 @@ export default function Performances() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredPerformances.map((performance) => (
+          {sortedPerformances.map((performance) => (
             <Card key={performance.id} className="overflow-hidden flex flex-col">
               <Link to={`/performances/${performance.id}`} className="flex-1">
                 <div className="aspect-video bg-muted relative overflow-hidden">
