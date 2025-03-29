@@ -1,134 +1,148 @@
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
 export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'performer' | 'choreographer';
   profilePicture?: string;
 }
 
 interface AuthContextType {
   currentUser: User | null;
+  users: User[];
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (name: string, email: string, password: string, role: User['role']) => Promise<void>;
+  signup: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Mock users for demonstration
-const MOCK_USERS = [
+// Fake users data
+const mockUsers: User[] = [
   {
     id: "1",
     name: "Jane Doe",
     email: "jane@example.com",
-    password: "password123",
-    role: "admin",
-    profilePicture: "https://i.pravatar.cc/150?img=1",
+    profilePicture: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=250&q=80"
   },
   {
     id: "2",
     name: "John Smith",
     email: "john@example.com",
-    password: "password123",
-    role: "performer",
-    profilePicture: "https://i.pravatar.cc/150?img=2",
+    profilePicture: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=250&q=80"
   },
+  {
+    id: "3",
+    name: "Sarah Johnson",
+    email: "sarah@example.com",
+    profilePicture: "https://images.unsplash.com/photo-1580489944761-15a19d654956?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=250&q=80"
+  }
 ];
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+// Creating the context with a default value
+const AuthContext = createContext<AuthContextType>({
+  currentUser: null,
+  users: [],
+  isLoading: true,
+  isAuthenticated: false,
+  login: async () => {},
+  signup: async () => {},
+  logout: () => {}
+});
+
+export const useAuth = () => useContext(AuthContext);
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check if user is logged in on component mount
+  // Simulate loading user data on mount
   useEffect(() => {
-    const storedUser = localStorage.getItem("currentUser");
-    if (storedUser) {
-      setCurrentUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
+    const loadUser = async () => {
+      // In a real app, you would check for a stored token or session
+      // and possibly make an API request to get the current user data
+      setTimeout(() => {
+        // Simulate logged in user (first user in our mock data)
+        setCurrentUser(mockUsers[0]);
+        setIsLoading(false);
+      }, 1000);
+    };
+
+    loadUser();
   }, []);
 
   const login = async (email: string, password: string) => {
-    // In a real app, this would be an API call
+    // In a real app, you would make an API request to validate credentials
+    // and retrieve a token or session identifier
+    
     setIsLoading(true);
-    try {
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      
-      const user = MOCK_USERS.find(
-        (u) => u.email === email && u.password === password
-      );
-      
-      if (!user) {
-        throw new Error("Invalid email or password");
-      }
-      
-      const { password: _, ...userWithoutPassword } = user;
-      setCurrentUser(userWithoutPassword as User);
-      localStorage.setItem("currentUser", JSON.stringify(userWithoutPassword));
-    } finally {
-      setIsLoading(false);
+    // Simulating API delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Find user with matching email
+    const user = mockUsers.find(u => u.email === email);
+    
+    if (user) {
+      setCurrentUser(user);
+      // In a real app, you would store the token/session in localStorage or cookies
+    } else {
+      throw new Error("Invalid credentials");
     }
+    
+    setIsLoading(false);
   };
 
-  const signup = async (name: string, email: string, password: string, role: User['role']) => {
-    // In a real app, this would be an API call
+  const signup = async (name: string, email: string, password: string) => {
+    // In a real app, you would make an API request to create a new user
+    
     setIsLoading(true);
-    try {
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      
-      // Check if user already exists
-      if (MOCK_USERS.some((u) => u.email === email)) {
-        throw new Error("User already exists");
-      }
-      
-      // Create new user
-      const newUser = {
-        id: String(MOCK_USERS.length + 1),
-        name,
-        email,
-        role,
-        profilePicture: `https://i.pravatar.cc/150?img=${MOCK_USERS.length + 3}`,
-      };
-      
-      setCurrentUser(newUser);
-      localStorage.setItem("currentUser", JSON.stringify(newUser));
-    } finally {
-      setIsLoading(false);
+    // Simulating API delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Check if email already exists
+    if (mockUsers.some(u => u.email === email)) {
+      throw new Error("Email already in use");
     }
+    
+    // Create new user
+    const newUser: User = {
+      id: String(mockUsers.length + 1), // Simple ID generation for mock data
+      name,
+      email,
+      // Default profile picture
+      profilePicture: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`
+    };
+    
+    // In a real app, you would add the user to the database
+    // For our mock, we'll simulate success and log the user in
+    setCurrentUser(newUser);
+    
+    setIsLoading(false);
   };
 
   const logout = () => {
+    // In a real app, you would clear the token/session
     setCurrentUser(null);
-    localStorage.removeItem("currentUser");
+  };
+
+  const value = {
+    currentUser,
+    users: mockUsers,
+    isLoading,
+    isAuthenticated: !!currentUser,
+    login,
+    signup,
+    logout
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        currentUser,
-        isLoading,
-        isAuthenticated: currentUser !== null,
-        login,
-        signup,
-        logout,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
 };

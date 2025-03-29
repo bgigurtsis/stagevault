@@ -194,9 +194,9 @@ export default function Dashboard() {
                   </div>
                   <CardHeader className="p-4 pb-2">
                     <CardTitle className="text-lg">{recording.title}</CardTitle>
-                    {recording.description && (
+                    {recording.notes && (
                       <CardDescription className="line-clamp-2">
-                        {recording.description}
+                        {recording.notes}
                       </CardDescription>
                     )}
                   </CardHeader>

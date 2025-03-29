@@ -27,8 +27,10 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Performances() {
+  const { users } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [performances, setPerformances] = useState(mockPerformances);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -65,6 +67,11 @@ export default function Performances() {
   // Count rehearsals for each performance
   const getRehearsalCount = (performanceId: string) => {
     return mockRehearsals.filter(rehearsal => rehearsal.performanceId === performanceId).length;
+  };
+
+  // Get user information from userId
+  const getUserById = (userId: string) => {
+    return users.find(user => user.id === userId) || null;
   };
 
   return (
@@ -173,25 +180,28 @@ export default function Performances() {
                     </p>
                   )}
                   
-                  {/* Added rehearsal count */}
+                  {/* Rehearsal count */}
                   <div className="flex items-center text-sm text-muted-foreground mb-3">
                     <PlaySquare className="h-4 w-4 mr-1" />
                     <span>{getRehearsalCount(performance.id)} rehearsals</span>
                   </div>
                   
-                  {/* Added performers list */}
+                  {/* Performers list */}
                   {performance.taggedUsers && performance.taggedUsers.length > 0 && (
                     <div className="flex items-center text-sm">
                       <Users className="h-4 w-4 mr-2 text-muted-foreground" />
                       <div className="flex -space-x-2 overflow-hidden">
-                        {performance.taggedUsers.slice(0, 3).map((user, index) => (
-                          <Avatar key={index} className="h-6 w-6 border-2 border-background">
-                            <AvatarImage src={user.profilePicture} />
-                            <AvatarFallback className="text-[10px]">
-                              {user.name.split(" ").map(n => n[0]).join("")}
-                            </AvatarFallback>
-                          </Avatar>
-                        ))}
+                        {performance.taggedUsers.slice(0, 3).map((userId, index) => {
+                          const user = getUserById(userId);
+                          return (
+                            <Avatar key={index} className="h-6 w-6 border-2 border-background">
+                              <AvatarImage src={user?.profilePicture} />
+                              <AvatarFallback className="text-[10px]">
+                                {user ? user.name.split(" ").map(n => n[0]).join("") : userId.substring(0, 2)}
+                              </AvatarFallback>
+                            </Avatar>
+                          );
+                        })}
                         {performance.taggedUsers.length > 3 && (
                           <div className="flex items-center justify-center h-6 w-6 rounded-full bg-muted text-[10px] font-medium">
                             +{performance.taggedUsers.length - 3}
