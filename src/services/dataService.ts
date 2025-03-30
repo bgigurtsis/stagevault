@@ -4,8 +4,8 @@ import { performanceService, CreatePerformanceData, UpdatePerformanceData } from
 import { rehearsalService, CreateRehearsalData, UpdateRehearsalData } from "./rehearsalService";
 import { recordingService, CreateRecordingData, UpdateRecordingData } from "./recordingService";
 
-// Re-export all the types
-export {
+// Re-export all the types with 'export type' syntax
+export type { 
   CreatePerformanceData,
   UpdatePerformanceData,
   CreateRehearsalData,
