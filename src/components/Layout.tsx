@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { Link, Outlet, useLocation, Navigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../hooks/useAuthContext";
 import {
   Home,
   User,

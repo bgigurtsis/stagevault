@@ -1,52 +1,12 @@
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Session, User as SupabaseUser } from "@supabase/supabase-js";
+import { Session } from "@supabase/supabase-js";
+import { AuthContextType, User, AuthProviderProps } from "./types";
+import { mockUsers, extractUserInfo } from "@/utils/authUtils";
+import { authService } from "@/services/authService";
 
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  profilePicture?: string;
-  role?: "performer" | "choreographer";
-}
-
-interface AuthContextType {
-  currentUser: User | null;
-  users: User[];
-  isLoading: boolean;
-  isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
-  signup: (name: string, email: string, password: string, role?: "performer" | "choreographer") => Promise<void>;
-  logout: () => void;
-}
-
-const mockUsers: User[] = [
-  {
-    id: "1",
-    name: "Jane Doe",
-    email: "jane@example.com",
-    profilePicture: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=250&q=80",
-    role: "choreographer"
-  },
-  {
-    id: "2",
-    name: "John Smith",
-    email: "john@example.com",
-    profilePicture: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=250&q=80",
-    role: "performer"
-  },
-  {
-    id: "3",
-    name: "Sarah Johnson",
-    email: "sarah@example.com",
-    profilePicture: "https://images.unsplash.com/photo-1580489944761-15a19d654956?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=250&q=80",
-    role: "performer"
-  }
-];
-
-const AuthContext = createContext<AuthContextType>({
+export const AuthContext = createContext<AuthContextType>({
   currentUser: null,
   users: [],
   isLoading: true,
@@ -57,11 +17,8 @@ const AuthContext = createContext<AuthContextType>({
   logout: async () => {}
 });
 
-export const useAuth = () => useContext(AuthContext);
-
-interface AuthProviderProps {
-  children: ReactNode;
-}
+// Export the useAuth hook from the hook file
+export { useAuth } from "@/hooks/useAuthContext";
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -123,93 +80,43 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     };
   }, []);
 
-  const extractUserInfo = (user: SupabaseUser): User => {
-    console.log("Extracting user info for user:", user.id);
-    const userInfo = {
-      id: user.id,
-      name: user.user_metadata.name || user.user_metadata.full_name || user.email?.split("@")[0] || "User",
-      email: user.email || "",
-      profilePicture: user.user_metadata.avatar_url || user.user_metadata.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.user_metadata.name || user.email?.split("@")[0] || "User")}&background=random`,
-      role: user.user_metadata.role || "performer"
-    };
-    console.log("User info extracted:", userInfo);
-    return userInfo;
-  };
-
+  // Auth methods that utilize our service layer
   const login = async (email: string, password: string) => {
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const user = mockUsers.find(u => u.email === email);
-    
-    if (user) {
+    try {
+      const user = await authService.login(email, password);
       setCurrentUser(user);
-    } else {
-      throw new Error("Invalid credentials");
+    } catch (error) {
+      throw error;
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
   const loginWithGoogle = async () => {
     try {
-      const currentUrl = window.location.origin;
-      const redirectTo = `${currentUrl}/login`;
-      console.log("Google login initiated");
-      console.log("Current URL:", currentUrl);
-      console.log("Redirecting to:", redirectTo);
-      
-      const { error, data } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectTo,
-          queryParams: {
-            prompt: 'select_account',
-            // Add Google Drive scope
-            access_type: 'offline',
-            scope: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/drive.file openid',
-          }
-        }
-      });
-      
-      if (error) {
-        console.error("Google login error:", error);
-        throw error;
-      }
-      
-      console.log("Google OAuth response:", data);
+      await authService.loginWithGoogle();
+      // The actual auth state will be updated by the onAuthStateChange listener
     } catch (error) {
-      console.error("Google login error:", error);
       throw error;
     }
   };
 
   const signup = async (name: string, email: string, password: string, role?: "performer" | "choreographer") => {
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    if (mockUsers.some(u => u.email === email)) {
-      throw new Error("Email already in use");
+    try {
+      const newUser = await authService.signup(name, email, password, role);
+      setCurrentUser(newUser);
+    } catch (error) {
+      throw error;
+    } finally {
+      setIsLoading(false);
     }
-    
-    const newUser: User = {
-      id: String(mockUsers.length + 1),
-      name,
-      email,
-      profilePicture: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`,
-      role: role || "performer"
-    };
-    
-    setCurrentUser(newUser);
-    
-    setIsLoading(false);
   };
 
   const logout = async () => {
-    console.log("Logging out user");
-    await supabase.auth.signOut();
-    console.log("User logged out, setting currentUser to null");
-    setCurrentUser(null);
+    await authService.logout();
+    // The auth state will be updated by the onAuthStateChange listener
   };
 
   const value = {
