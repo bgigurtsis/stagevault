@@ -9,7 +9,142 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      performances: {
+        Row: {
+          cover_image: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          end_date: string | null
+          id: string
+          start_date: string | null
+          tagged_users: string[] | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          cover_image?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          start_date?: string | null
+          tagged_users?: string[] | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          cover_image?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          start_date?: string | null
+          tagged_users?: string[] | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      recordings: {
+        Row: {
+          created_at: string
+          duration: number | null
+          google_file_id: string | null
+          id: string
+          notes: string | null
+          rehearsal_id: string
+          tagged_users: string[] | null
+          tags: string[] | null
+          thumbnail_url: string | null
+          title: string
+          video_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration?: number | null
+          google_file_id?: string | null
+          id?: string
+          notes?: string | null
+          rehearsal_id: string
+          tagged_users?: string[] | null
+          tags?: string[] | null
+          thumbnail_url?: string | null
+          title: string
+          video_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration?: number | null
+          google_file_id?: string | null
+          id?: string
+          notes?: string | null
+          rehearsal_id?: string
+          tagged_users?: string[] | null
+          tags?: string[] | null
+          thumbnail_url?: string | null
+          title?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recordings_rehearsal_id_fkey"
+            columns: ["rehearsal_id"]
+            isOneToOne: false
+            referencedRelation: "rehearsals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rehearsals: {
+        Row: {
+          created_at: string
+          date: string
+          description: string | null
+          id: string
+          location: string | null
+          notes: string | null
+          performance_id: string
+          tagged_users: string[] | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          description?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          performance_id: string
+          tagged_users?: string[] | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          description?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          performance_id?: string
+          tagged_users?: string[] | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rehearsals_performance_id_fkey"
+            columns: ["performance_id"]
+            isOneToOne: false
+            referencedRelation: "performances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
