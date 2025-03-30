@@ -38,8 +38,8 @@ class DataService {
   }
   
   // Rehearsal methods
-  getRehearsalsByPerformanceId(performanceId: string): Promise<Rehearsal[]> {
-    return rehearsalService.getRehearsalsByPerformanceId(performanceId);
+  getRehearsalsByPerformance(performanceId: string): Promise<Rehearsal[]> {
+    return rehearsalService.getRehearsalsByPerformance(performanceId);
   }
   
   getRehearsalById(id: string): Promise<Rehearsal | null> {
@@ -50,8 +50,8 @@ class DataService {
     return rehearsalService.createRehearsal(rehearsalData);
   }
   
-  updateRehearsal(rehearsalData: UpdateRehearsalData): Promise<Rehearsal | null> {
-    return rehearsalService.updateRehearsal(rehearsalData);
+  updateRehearsal(id: string, rehearsalData: Partial<CreateRehearsalData>): Promise<Rehearsal | null> {
+    return rehearsalService.updateRehearsal(id, rehearsalData);
   }
   
   deleteRehearsal(id: string): Promise<boolean> {

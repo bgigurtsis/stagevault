@@ -26,7 +26,7 @@ export default function Rehearsals() {
         setRehearsals(rehearsalsData);
 
         // Fetch all performances to map them to rehearsals
-        const performancesData = await performanceService.getAllPerformances();
+        const performancesData = await performanceService.getPerformances();
         const performancesMap: Record<string, Performance> = {};
         performancesData.forEach(performance => {
           performancesMap[performance.id] = performance;

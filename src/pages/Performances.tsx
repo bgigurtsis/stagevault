@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -68,7 +67,7 @@ export default function Performances() {
   const { data: rehearsals = [] } = useQuery({
     queryKey: ["rehearsals"],
     queryFn: async () => {
-      return await rehearsalService.getRehearsals();
+      return await rehearsalService.getAllRehearsals();
     }
   });
   

@@ -2,6 +2,20 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Rehearsal } from "@/types";
 
+export interface CreateRehearsalData {
+  title: string;
+  description?: string;
+  date: string;
+  location?: string;
+  notes?: string;
+  performanceId: string;
+  taggedUsers?: string[];
+}
+
+export interface UpdateRehearsalData extends Partial<CreateRehearsalData> {
+  id: string;
+}
+
 class RehearsalService {
   /**
    * Get all rehearsals
@@ -20,7 +34,18 @@ class RehearsalService {
       }
 
       console.log("Fetched rehearsals:", data);
-      return data || [];
+      return data.map(item => ({
+        id: item.id,
+        performanceId: item.performance_id,
+        title: item.title,
+        description: item.description || undefined,
+        date: item.date,
+        location: item.location || undefined,
+        createdAt: item.created_at,
+        updatedAt: item.updated_at,
+        taggedUsers: item.tagged_users || [],
+        notes: item.notes || undefined
+      }));
     } catch (error) {
       console.error("Error in getAllRehearsals:", error);
       throw error;
@@ -36,7 +61,7 @@ class RehearsalService {
       const { data, error } = await supabase
         .from("rehearsals")
         .select("*")
-        .eq("performanceId", performanceId)
+        .eq("performance_id", performanceId)
         .order("date", { ascending: false });
 
       if (error) {
@@ -45,7 +70,18 @@ class RehearsalService {
       }
 
       console.log("Fetched rehearsals for performance:", data);
-      return data || [];
+      return data.map(item => ({
+        id: item.id,
+        performanceId: item.performance_id,
+        title: item.title,
+        description: item.description || undefined,
+        date: item.date,
+        location: item.location || undefined,
+        createdAt: item.created_at,
+        updatedAt: item.updated_at,
+        taggedUsers: item.tagged_users || [],
+        notes: item.notes || undefined
+      }));
     } catch (error) {
       console.error("Error in getRehearsalsByPerformance:", error);
       throw error;
@@ -74,7 +110,18 @@ class RehearsalService {
       }
 
       console.log("Fetched rehearsal:", data);
-      return data;
+      return {
+        id: data.id,
+        performanceId: data.performance_id,
+        title: data.title,
+        description: data.description || undefined,
+        date: data.date,
+        location: data.location || undefined,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+        taggedUsers: data.tagged_users || [],
+        notes: data.notes || undefined
+      };
     } catch (error) {
       console.error("Error in getRehearsalById:", error);
       throw error;
@@ -84,12 +131,20 @@ class RehearsalService {
   /**
    * Create a new rehearsal
    */
-  async createRehearsal(rehearsal: Omit<Rehearsal, "id" | "createdAt" | "updatedAt">): Promise<Rehearsal> {
+  async createRehearsal(rehearsal: CreateRehearsalData): Promise<Rehearsal> {
     try {
       console.log("Creating new rehearsal:", rehearsal);
       const { data, error } = await supabase
         .from("rehearsals")
-        .insert([rehearsal])
+        .insert([{
+          title: rehearsal.title,
+          description: rehearsal.description,
+          date: rehearsal.date,
+          location: rehearsal.location,
+          notes: rehearsal.notes,
+          performance_id: rehearsal.performanceId,
+          tagged_users: rehearsal.taggedUsers || []
+        }])
         .select()
         .single();
 
@@ -99,7 +154,18 @@ class RehearsalService {
       }
 
       console.log("Created rehearsal:", data);
-      return data;
+      return {
+        id: data.id,
+        performanceId: data.performance_id,
+        title: data.title,
+        description: data.description || undefined,
+        date: data.date,
+        location: data.location || undefined,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+        taggedUsers: data.tagged_users || [],
+        notes: data.notes || undefined
+      };
     } catch (error) {
       console.error("Error in createRehearsal:", error);
       throw error;
@@ -109,12 +175,22 @@ class RehearsalService {
   /**
    * Update a rehearsal
    */
-  async updateRehearsal(rehearsalId: string, updates: Partial<Rehearsal>): Promise<Rehearsal> {
+  async updateRehearsal(rehearsalId: string, updates: Partial<CreateRehearsalData>): Promise<Rehearsal> {
     try {
       console.log(`Updating rehearsal ${rehearsalId}:`, updates);
+      
+      const updateData: any = {};
+      if (updates.title !== undefined) updateData.title = updates.title;
+      if (updates.description !== undefined) updateData.description = updates.description;
+      if (updates.date !== undefined) updateData.date = updates.date;
+      if (updates.location !== undefined) updateData.location = updates.location;
+      if (updates.notes !== undefined) updateData.notes = updates.notes;
+      if (updates.performanceId !== undefined) updateData.performance_id = updates.performanceId;
+      if (updates.taggedUsers !== undefined) updateData.tagged_users = updates.taggedUsers;
+      
       const { data, error } = await supabase
         .from("rehearsals")
-        .update(updates)
+        .update(updateData)
         .eq("id", rehearsalId)
         .select()
         .single();
@@ -125,7 +201,18 @@ class RehearsalService {
       }
 
       console.log("Updated rehearsal:", data);
-      return data;
+      return {
+        id: data.id,
+        performanceId: data.performance_id,
+        title: data.title,
+        description: data.description || undefined,
+        date: data.date,
+        location: data.location || undefined,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+        taggedUsers: data.tagged_users || [],
+        notes: data.notes || undefined
+      };
     } catch (error) {
       console.error("Error in updateRehearsal:", error);
       throw error;
@@ -135,7 +222,7 @@ class RehearsalService {
   /**
    * Delete a rehearsal
    */
-  async deleteRehearsal(rehearsalId: string): Promise<void> {
+  async deleteRehearsal(rehearsalId: string): Promise<boolean> {
     try {
       console.log(`Deleting rehearsal with ID: ${rehearsalId}`);
       const { error } = await supabase
@@ -149,6 +236,7 @@ class RehearsalService {
       }
 
       console.log("Rehearsal deleted successfully");
+      return true;
     } catch (error) {
       console.error("Error in deleteRehearsal:", error);
       throw error;

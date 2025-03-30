@@ -41,7 +41,7 @@ export default function RehearsalForm({ rehearsal, onSubmit, performanceId }: Re
   useEffect(() => {
     const fetchPerformances = async () => {
       try {
-        const data = await performanceService.getAllPerformances();
+        const data = await performanceService.getPerformances();
         setPerformances(data);
         // If no performance is selected and we have performances, select the first one
         if (!selectedPerformanceId && data.length > 0 && !performanceId) {

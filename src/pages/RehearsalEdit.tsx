@@ -44,6 +44,13 @@ export default function RehearsalEdit() {
     
     try {
       await rehearsalService.updateRehearsal(rehearsalId, updates);
+      
+      toast({
+        title: "Success",
+        description: "Rehearsal updated successfully!",
+      });
+      
+      navigate(`/rehearsals/${rehearsalId}`);
     } catch (error) {
       console.error("Error updating rehearsal:", error);
       toast({

@@ -17,7 +17,29 @@ export default function RehearsalNew() {
   const handleCreateRehearsal = async (rehearsal: Omit<Rehearsal, "id" | "createdAt" | "updatedAt">) => {
     setLoading(true);
     try {
-      await rehearsalService.createRehearsal(rehearsal);
+      const created = await rehearsalService.createRehearsal({
+        title: rehearsal.title,
+        description: rehearsal.description,
+        date: rehearsal.date,
+        location: rehearsal.location,
+        notes: rehearsal.notes,
+        performanceId: rehearsal.performanceId,
+        taggedUsers: rehearsal.taggedUsers,
+      });
+      
+      toast({
+        title: "Success",
+        description: "Rehearsal created successfully!",
+      });
+      
+      // Navigate back to performance detail or rehearsals list
+      if (performanceId) {
+        navigate(`/performances/${performanceId}`);
+      } else {
+        navigate("/rehearsals");
+      }
+      
+      return created;
     } catch (error) {
       console.error("Error creating rehearsal:", error);
       toast({
