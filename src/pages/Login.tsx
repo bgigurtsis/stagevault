@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -5,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Video } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Login() {
   const [loading, setLoading] = useState(false);
@@ -13,6 +15,69 @@ export default function Login() {
   const { toast } = useToast();
 
   console.log("Login component rendered, isAuthenticated:", isAuthenticated);
+
+  // Handle authentication hash params in URL
+  useEffect(() => {
+    // Check for hash parameters (access_token, etc.) which indicates a successful OAuth redirect
+    const hash = window.location.hash;
+    console.log("Checking URL hash for auth tokens:", hash ? "Hash exists" : "No hash");
+    
+    if (hash) {
+      console.log("Full hash string:", hash);
+      
+      if (hash.includes("access_token")) {
+        console.log("Access token found in hash");
+        
+        // Log all parameters in the hash for debugging
+        const hashParams = new URLSearchParams(hash.substring(1));
+        for (const [key, value] of hashParams.entries()) {
+          console.log(`Hash parameter: ${key} = ${value.substring(0, 10)}...`);
+        }
+        
+        // Get the session from the hash
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        const expiresAt = hashParams.get('expires_at');
+        
+        if (accessToken && refreshToken) {
+          console.log("Attempting to set session from hash parameters");
+          
+          // Try to set the session manually
+          supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+          }).then(({ data, error }) => {
+            if (error) {
+              console.error("Error setting session:", error);
+              toast({
+                title: "Authentication error",
+                description: "Failed to complete login. Please try again.",
+                variant: "destructive",
+              });
+            } else {
+              console.log("Session set successfully:", data.session ? "Session exists" : "No session");
+              if (data.session) {
+                console.log("User authenticated, redirecting to home page");
+                navigate("/");
+                toast({
+                  title: "Welcome back!",
+                  description: "You have successfully logged in.",
+                });
+              }
+            }
+          });
+        }
+        
+        // Clear the hash from the URL to avoid issues on refresh
+        window.history.replaceState(null, document.title, window.location.pathname);
+        console.log("URL hash cleared");
+      }
+    }
+    
+    // Log the current path
+    console.log("Current path:", window.location.pathname);
+    console.log("Current full URL:", window.location.href);
+  }, [navigate, toast]);
 
   // Check for existing session and redirect if authenticated
   useEffect(() => {
@@ -26,34 +91,6 @@ export default function Login() {
       });
     }
   }, [isAuthenticated, navigate, toast]);
-
-  // Handle authentication hash params in URL
-  useEffect(() => {
-    // Check for hash parameters (access_token, etc.) which indicates a successful OAuth redirect
-    const hash = window.location.hash;
-    console.log("Checking URL hash for auth tokens:", hash ? "Hash exists" : "No hash");
-    
-    if (hash) {
-      console.log("Full hash string:", hash);
-      
-      if (hash.includes("access_token")) {
-        console.log("Access token found in hash");
-        // Clear the hash from the URL to avoid issues on refresh
-        window.history.replaceState(null, document.title, window.location.pathname);
-        console.log("URL hash cleared");
-      }
-      
-      // Log all parameters in the hash for debugging
-      const hashParams = new URLSearchParams(hash.substring(1));
-      for (const [key, value] of hashParams.entries()) {
-        console.log(`Hash parameter: ${key} = ${value.substring(0, 10)}...`);
-      }
-    }
-    
-    // Log the current path
-    console.log("Current path:", window.location.pathname);
-    console.log("Current full URL:", window.location.href);
-  }, []);
 
   const handleGoogleLogin = async () => {
     console.log("Google login button clicked");

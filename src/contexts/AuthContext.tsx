@@ -71,40 +71,47 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   useEffect(() => {
     console.log("AuthProvider initialized");
     
+    // Set up auth state listener FIRST before checking for existing session
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         console.log("Auth state changed:", event, session ? "Session exists" : "No session");
         if (session?.user) {
           console.log("User found in session:", session.user.id);
           console.log("User metadata:", JSON.stringify(session.user.user_metadata));
-        }
-        setSession(session);
-        
-        if (session?.user) {
-          const userInfo = extractUserInfo(session.user);
-          console.log("Extracted user info:", userInfo);
-          setCurrentUser(userInfo);
+          
+          // Adding a delay here to try to avoid race conditions
+          setTimeout(() => {
+            const userInfo = extractUserInfo(session.user);
+            console.log("Extracted user info:", userInfo);
+            setCurrentUser(userInfo);
+            setSession(session);
+            console.log("Authentication state updated after auth state change");
+          }, 0);
         } else {
           console.log("No user in session, setting currentUser to null");
           setCurrentUser(null);
+          setSession(null);
         }
         
         setIsLoading(false);
       }
     );
 
+    // THEN check for existing session
+    console.log("Checking for existing session...");
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log("Initial session check:", session ? "Session exists" : "No session");
       if (session?.user) {
         console.log("Initial user found:", session.user.id);
         console.log("Initial user metadata:", JSON.stringify(session.user.user_metadata));
-      }
-      setSession(session);
-      
-      if (session?.user) {
+        
         const userInfo = extractUserInfo(session.user);
         console.log("Initial extracted user info:", userInfo);
         setCurrentUser(userInfo);
+        setSession(session);
+        console.log("Authentication state updated after initial session check");
+      } else {
+        console.log("No initial session found");
       }
       
       setIsLoading(false);
@@ -118,13 +125,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const extractUserInfo = (user: SupabaseUser): User => {
     console.log("Extracting user info for user:", user.id);
-    return {
+    const userInfo = {
       id: user.id,
       name: user.user_metadata.name || user.user_metadata.full_name || user.email?.split("@")[0] || "User",
       email: user.email || "",
       profilePicture: user.user_metadata.avatar_url || user.user_metadata.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.user_metadata.name || user.email?.split("@")[0] || "User")}&background=random`,
       role: user.user_metadata.role || "performer"
     };
+    console.log("User info extracted:", userInfo);
+    return userInfo;
   };
 
   const login = async (email: string, password: string) => {
@@ -210,6 +219,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     signup,
     logout
   };
+
+  // Debug current authentication state on each render
+  console.log("Current auth state:", {
+    isAuthenticated: !!currentUser,
+    hasSession: !!session,
+    isLoading
+  });
 
   return (
     <AuthContext.Provider value={value}>
