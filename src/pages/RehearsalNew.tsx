@@ -14,10 +14,10 @@ export default function RehearsalNew() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleCreateRehearsal = async (rehearsal: Omit<Rehearsal, "id" | "createdAt" | "updatedAt">) => {
+  const handleCreateRehearsal = async (rehearsal: Omit<Rehearsal, "id" | "createdAt" | "updatedAt">): Promise<void> => {
     setLoading(true);
     try {
-      const created = await rehearsalService.createRehearsal({
+      await rehearsalService.createRehearsal({
         title: rehearsal.title,
         description: rehearsal.description,
         date: rehearsal.date,
@@ -39,7 +39,6 @@ export default function RehearsalNew() {
         navigate("/rehearsals");
       }
       
-      return created;
     } catch (error) {
       console.error("Error creating rehearsal:", error);
       toast({
