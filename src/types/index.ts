@@ -12,6 +12,7 @@ export interface Performance {
   updatedAt: string;
   createdBy: string;
   taggedUsers?: string[];
+  driveFolderId?: string;
 }
 
 export interface Rehearsal {
@@ -25,6 +26,7 @@ export interface Rehearsal {
   updatedAt: string;
   taggedUsers?: string[];
   notes?: string;
+  driveFolderId?: string;
 }
 
 export interface Recording {

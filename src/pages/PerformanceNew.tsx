@@ -7,9 +7,11 @@ import { PerformanceForm } from "@/components/PerformanceForm";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuthContext";
 import { performanceService } from "@/services/performanceService";
+import { googleDriveService } from "@/services/googleDriveService";
 
 export default function PerformanceNew() {
   const [isLoading, setIsLoading] = useState(false);
+  const [driveTestLoading, setDriveTestLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const { currentUser } = useAuth();
@@ -63,6 +65,32 @@ export default function PerformanceNew() {
     }
   };
 
+  const testDriveAccess = async () => {
+    setDriveTestLoading(true);
+    try {
+      const result = await googleDriveService.testDriveAccess();
+      
+      toast({
+        title: result.success ? "Drive Access Test Successful" : "Drive Access Test Failed",
+        description: result.message,
+        variant: result.success ? "default" : "destructive",
+      });
+      
+      if (result.success && result.folderId) {
+        console.log(`Root folder ID: ${result.folderId}`);
+      }
+    } catch (error) {
+      console.error("Error testing drive access:", error);
+      toast({
+        title: "Error Testing Drive Access",
+        description: error.message || "An unexpected error occurred while testing Google Drive access",
+        variant: "destructive",
+      });
+    } finally {
+      setDriveTestLoading(false);
+    }
+  };
+
   return (
     <div className="container max-w-3xl py-6 space-y-6">
       <div className="flex items-center gap-2">
@@ -73,6 +101,18 @@ export default function PerformanceNew() {
           <Theater className="h-7 w-7" />
           <span>New Performance</span>
         </h1>
+      </div>
+
+      <div className="flex justify-end">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={testDriveAccess}
+          disabled={driveTestLoading}
+          className="mb-4"
+        >
+          {driveTestLoading ? "Testing..." : "Test Drive Folder"}
+        </Button>
       </div>
 
       <PerformanceForm 

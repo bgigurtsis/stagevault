@@ -1,6 +1,8 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { Rehearsal } from "@/types";
+import { googleDriveService } from "./googleDriveService";
+import { performanceService } from "./performanceService";
 
 export interface CreateRehearsalData {
   title: string;
@@ -44,7 +46,8 @@ class RehearsalService {
         createdAt: item.created_at,
         updatedAt: item.updated_at,
         taggedUsers: item.tagged_users || [],
-        notes: item.notes || undefined
+        notes: item.notes || undefined,
+        driveFolderId: item.drive_folder_id || undefined
       }));
     } catch (error) {
       console.error("Error in getAllRehearsals:", error);
@@ -80,7 +83,8 @@ class RehearsalService {
         createdAt: item.created_at,
         updatedAt: item.updated_at,
         taggedUsers: item.tagged_users || [],
-        notes: item.notes || undefined
+        notes: item.notes || undefined,
+        driveFolderId: item.drive_folder_id || undefined
       }));
     } catch (error) {
       console.error("Error in getRehearsalsByPerformance:", error);
@@ -120,7 +124,8 @@ class RehearsalService {
         createdAt: data.created_at,
         updatedAt: data.updated_at,
         taggedUsers: data.tagged_users || [],
-        notes: data.notes || undefined
+        notes: data.notes || undefined,
+        driveFolderId: data.drive_folder_id || undefined
       };
     } catch (error) {
       console.error("Error in getRehearsalById:", error);
@@ -134,6 +139,44 @@ class RehearsalService {
   async createRehearsal(rehearsal: CreateRehearsalData): Promise<Rehearsal> {
     try {
       console.log("Creating new rehearsal:", rehearsal);
+      
+      // Get the performance to get its title and folder ID
+      const performance = await performanceService.getPerformanceById(rehearsal.performanceId);
+      if (!performance) {
+        throw new Error(`Performance with ID ${rehearsal.performanceId} not found`);
+      }
+      
+      // Create folder in Google Drive
+      let driveFolderId: string | null = null;
+      
+      try {
+        console.log(`Creating rehearsal folder in Google Drive for performance: ${performance.title}`);
+        
+        // If the performance has a folder ID, create the rehearsal folder as a child
+        if (performance.driveFolderId) {
+          driveFolderId = await googleDriveService.createRehearsalFolder(
+            rehearsal.title, 
+            performance.title,
+            performance.driveFolderId
+          );
+        } else {
+          // Create the rehearsal folder directly in the performance folder
+          driveFolderId = await googleDriveService.createRehearsalFolderWithPerformance(
+            rehearsal.title,
+            performance.title
+          );
+        }
+        
+        if (driveFolderId) {
+          console.log(`Successfully created rehearsal folder with ID: ${driveFolderId}`);
+        } else {
+          console.warn("Could not create Google Drive folder for rehearsal. Will continue without folder ID.");
+        }
+      } catch (driveError) {
+        console.error("Error creating Google Drive folder for rehearsal:", driveError);
+        // Continue with DB insert even if folder creation fails
+      }
+      
       const { data, error } = await supabase
         .from("rehearsals")
         .insert([{
@@ -143,7 +186,8 @@ class RehearsalService {
           location: rehearsal.location,
           notes: rehearsal.notes,
           performance_id: rehearsal.performanceId,
-          tagged_users: rehearsal.taggedUsers || []
+          tagged_users: rehearsal.taggedUsers || [],
+          drive_folder_id: driveFolderId
         }])
         .select()
         .single();
@@ -164,7 +208,8 @@ class RehearsalService {
         createdAt: data.created_at,
         updatedAt: data.updated_at,
         taggedUsers: data.tagged_users || [],
-        notes: data.notes || undefined
+        notes: data.notes || undefined,
+        driveFolderId: data.drive_folder_id || undefined
       };
     } catch (error) {
       console.error("Error in createRehearsal:", error);
@@ -211,7 +256,8 @@ class RehearsalService {
         createdAt: data.created_at,
         updatedAt: data.updated_at,
         taggedUsers: data.tagged_users || [],
-        notes: data.notes || undefined
+        notes: data.notes || undefined,
+        driveFolderId: data.drive_folder_id || undefined
       };
     } catch (error) {
       console.error("Error in updateRehearsal:", error);
@@ -225,6 +271,32 @@ class RehearsalService {
   async deleteRehearsal(rehearsalId: string): Promise<boolean> {
     try {
       console.log(`Deleting rehearsal with ID: ${rehearsalId}`);
+      
+      // Get the rehearsal to retrieve the Drive folder ID
+      try {
+        const rehearsal = await this.getRehearsalById(rehearsalId);
+        
+        // Delete the Google Drive folder if it exists
+        if (rehearsal.driveFolderId) {
+          try {
+            console.log(`Attempting to delete Google Drive folder with ID: ${rehearsal.driveFolderId}`);
+            const folderDeleted = await googleDriveService.deleteFolder(rehearsal.driveFolderId);
+            
+            if (folderDeleted) {
+              console.log(`Successfully deleted Google Drive folder for rehearsal: ${rehearsalId}`);
+            } else {
+              console.warn(`Failed to delete Google Drive folder for rehearsal: ${rehearsalId}`);
+            }
+          } catch (driveError) {
+            console.error(`Error deleting Google Drive folder for rehearsal ${rehearsalId}:`, driveError);
+            // Continue with database deletion even if folder deletion fails
+          }
+        }
+      } catch (rehearsalError) {
+        console.error(`Error retrieving rehearsal ${rehearsalId} for deletion:`, rehearsalError);
+        // Continue with deletion even if retrieval fails
+      }
+      
       const { error } = await supabase
         .from("rehearsals")
         .delete()

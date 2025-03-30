@@ -1,5 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
+import { format } from 'date-fns';
 
 const ROOT_FOLDER_NAME = "StageVault Recordings";
 
@@ -206,6 +207,132 @@ class GoogleDriveService {
   }
 
   /**
+   * Create a folder for a performance
+   */
+  public async createPerformanceFolder(performanceName: string): Promise<string | null> {
+    try {
+      console.log(`=== Creating performance folder for: "${performanceName}" ===`);
+      
+      // Find or create the root StageVault folder
+      const rootFolderId = await this.findOrCreateFolder(ROOT_FOLDER_NAME);
+      if (!rootFolderId) {
+        console.error("Failed to create or find root folder");
+        return null;
+      }
+      
+      // Create a formatted folder name
+      const date = format(new Date(), 'yyyy-MM-dd');
+      const folderName = `Performance - ${performanceName} (${date})`;
+      
+      // Find or create the performance folder
+      const performanceFolderId = await this.findOrCreateFolder(folderName, rootFolderId);
+      
+      if (!performanceFolderId) {
+        console.error("Failed to create or find performance folder");
+        return null;
+      }
+      
+      console.log("Successfully created performance folder with ID:", performanceFolderId);
+      return performanceFolderId;
+    } catch (error) {
+      console.error("Error creating performance folder:", error);
+      return null;
+    }
+  }
+  
+  /**
+   * Create a folder for a rehearsal under an existing performance folder
+   */
+  public async createRehearsalFolder(rehearsalName: string, performanceName: string, performanceFolderId: string): Promise<string | null> {
+    try {
+      console.log(`=== Creating rehearsal folder for: "${rehearsalName}" under performance: "${performanceName}" ===`);
+      
+      // Create a formatted folder name 
+      const date = format(new Date(), 'yyyy-MM-dd');
+      const folderName = `Rehearsal - ${rehearsalName} (${date})`;
+      
+      // Find or create the rehearsal folder
+      const rehearsalFolderId = await this.findOrCreateFolder(folderName, performanceFolderId);
+      
+      if (!rehearsalFolderId) {
+        console.error("Failed to create or find rehearsal folder");
+        return null;
+      }
+      
+      console.log("Successfully created rehearsal folder with ID:", rehearsalFolderId);
+      return rehearsalFolderId;
+    } catch (error) {
+      console.error("Error creating rehearsal folder:", error);
+      return null;
+    }
+  }
+  
+  /**
+   * Create a rehearsal folder when the performance folder might not exist yet
+   */
+  public async createRehearsalFolderWithPerformance(rehearsalName: string, performanceName: string): Promise<string | null> {
+    try {
+      console.log(`=== Creating rehearsal folder: "${rehearsalName}" and ensuring performance folder: "${performanceName}" exists ===`);
+      
+      // First create/find the performance folder
+      const performanceFolderId = await this.createPerformanceFolder(performanceName);
+      if (!performanceFolderId) {
+        console.error("Failed to create performance folder");
+        return null;
+      }
+      
+      // Then create the rehearsal folder under it
+      return await this.createRehearsalFolder(rehearsalName, performanceName, performanceFolderId);
+    } catch (error) {
+      console.error("Error ensuring folder structure:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Delete a folder by ID
+   */
+  public async deleteFolder(folderId: string): Promise<boolean> {
+    try {
+      console.log(`=== Deleting folder with ID: ${folderId} ===`);
+      const accessToken = await this.getAccessToken();
+      if (!accessToken) {
+        console.error("No access token available for Google Drive operations");
+        return false;
+      }
+      
+      const response = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${folderId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+      
+      if (!response.ok) {
+        // If response status is 404, the folder was already deleted
+        if (response.status === 404) {
+          console.log(`Folder with ID ${folderId} not found (already deleted)`);
+          return true;
+        }
+        
+        console.error("Error deleting folder:", response.status, response.statusText);
+        const errorText = await response.text();
+        console.error("Error response:", errorText);
+        return false;
+      }
+      
+      console.log(`Successfully deleted folder with ID: ${folderId}`);
+      return true;
+    } catch (error) {
+      console.error("Error deleting folder:", error);
+      return false;
+    }
+  }
+
+  /**
    * Ensure the folder hierarchy exists for a performance and rehearsal
    */
   public async ensureFolderStructure(performanceName: string, rehearsalName: string): Promise<string | null> {
@@ -361,6 +488,58 @@ class GoogleDriveService {
     } catch (error) {
       console.error("Error uploading video:", error);
       return null;
+    }
+  }
+
+  /**
+   * Test Google Drive API access by creating a test folder
+   */
+  public async testDriveAccess(): Promise<{ success: boolean; message: string; folderId?: string }> {
+    try {
+      console.log("=== Testing Google Drive API access ===");
+      
+      const accessToken = await this.getAccessToken();
+      if (!accessToken) {
+        return { 
+          success: false, 
+          message: "Failed to get Google Drive access token. Please check your Google login and permissions." 
+        };
+      }
+      
+      // Test folder creation
+      const testFolderName = `Test Folder - ${new Date().toISOString()}`;
+      const rootFolderId = await this.findOrCreateFolder(ROOT_FOLDER_NAME);
+      
+      if (!rootFolderId) {
+        return { 
+          success: false, 
+          message: "Failed to create or find the root StageVault folder. Check Drive permissions." 
+        };
+      }
+      
+      const testFolderId = await this.findOrCreateFolder(testFolderName, rootFolderId);
+      
+      if (!testFolderId) {
+        return { 
+          success: false, 
+          message: "Failed to create a test folder. Check Drive permissions." 
+        };
+      }
+      
+      // Clean up by deleting the test folder
+      await this.deleteFolder(testFolderId);
+      
+      return { 
+        success: true, 
+        message: "Successfully tested Google Drive access. Folder creation and deletion works!", 
+        folderId: rootFolderId 
+      };
+    } catch (error) {
+      console.error("Error testing Google Drive access:", error);
+      return { 
+        success: false, 
+        message: `Error testing Google Drive access: ${error.message || "Unknown error"}` 
+      };
     }
   }
 
