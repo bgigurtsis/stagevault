@@ -14,49 +14,81 @@ export default function Login() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  console.log("Login component rendered, isAuthenticated:", isAuthenticated);
+  console.log("=== Login Component Rendered ===");
+  console.log("isAuthenticated:", isAuthenticated);
 
   // Handle authentication hash params in URL
   useEffect(() => {
+    // Function to parse URL hash params into an object
+    const parseHashParams = (hash: string) => {
+      const params = new URLSearchParams(hash.substring(1));
+      const result: Record<string, string> = {};
+      for (const [key, value] of params.entries()) {
+        result[key] = value;
+      }
+      return result;
+    };
+    
     // Check for hash parameters (access_token, etc.) which indicates a successful OAuth redirect
     const hash = window.location.hash;
-    console.log("Checking URL hash for auth tokens:", hash ? "Hash exists" : "No hash");
+    console.log("=== Checking URL hash for auth tokens ===");
+    console.log("Hash exists:", !!hash);
     
     if (hash) {
       console.log("Full hash string:", hash);
       
-      if (hash.includes("access_token")) {
-        console.log("Access token found in hash");
+      // Parse all hash parameters
+      const hashParams = parseHashParams(hash);
+      console.log("Parsed hash parameters:", hashParams);
+      
+      if (hashParams.access_token) {
+        console.log("=== Access token found in hash ===");
+        console.log("Access token (first 20 chars):", hashParams.access_token.substring(0, 20) + "...");
+        console.log("Token type:", hashParams.token_type);
+        console.log("Expires in:", hashParams.expires_in);
+        console.log("Refresh token exists:", !!hashParams.refresh_token);
         
-        // Log all parameters in the hash for debugging
-        const hashParams = new URLSearchParams(hash.substring(1));
-        for (const [key, value] of hashParams.entries()) {
-          console.log(`Hash parameter: ${key} = ${value.substring(0, 10)}...`);
+        // Check if we got a provider token (this is needed for Google Drive API)
+        if (hashParams.provider_token) {
+          console.log("Provider token exists (first 20 chars):", hashParams.provider_token.substring(0, 20) + "...");
+        } else {
+          console.warn("No provider_token in hash! This is needed for Google Drive access");
+          console.log("Requested scopes may not have been granted");
         }
         
-        // Get the session from the hash
-        const accessToken = hashParams.get('access_token');
-        const refreshToken = hashParams.get('refresh_token');
-        const expiresAt = hashParams.get('expires_at');
-        
-        if (accessToken && refreshToken) {
+        if (hashParams.access_token && hashParams.refresh_token) {
           console.log("Attempting to set session from hash parameters");
           
           // Try to set the session manually
           supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken
+            access_token: hashParams.access_token,
+            refresh_token: hashParams.refresh_token
           }).then(({ data, error }) => {
             if (error) {
-              console.error("Error setting session:", error);
+              console.error("=== Error setting session ===");
+              console.error("Error object:", error);
+              console.error("Error message:", error.message);
+              console.error("Error status:", error.status);
               toast({
                 title: "Authentication error",
                 description: "Failed to complete login. Please try again.",
                 variant: "destructive",
               });
             } else {
-              console.log("Session set successfully:", data.session ? "Session exists" : "No session");
+              console.log("=== Session set successfully ===");
+              console.log("Session exists:", !!data.session);
+              
               if (data.session) {
+                console.log("User ID:", data.session.user.id);
+                console.log("Session expires at:", new Date(data.session.expires_at * 1000).toISOString());
+                console.log("Provider token exists:", !!data.session.provider_token);
+                
+                if (data.session.provider_token) {
+                  console.log("Provider token (first 20 chars):", data.session.provider_token.substring(0, 20) + "...");
+                } else {
+                  console.warn("No provider token in session - Google Drive API won't work!");
+                }
+                
                 console.log("User authenticated, redirecting to home page");
                 navigate("/");
                 toast({
@@ -81,7 +113,9 @@ export default function Login() {
 
   // Check for existing session and redirect if authenticated
   useEffect(() => {
-    console.log("Login - auth status check useEffect, isAuthenticated:", isAuthenticated);
+    console.log("=== Login - auth status check useEffect ===");
+    console.log("isAuthenticated:", isAuthenticated);
+    
     if (isAuthenticated) {
       console.log("User is authenticated, redirecting to home page");
       navigate("/");
@@ -93,7 +127,7 @@ export default function Login() {
   }, [isAuthenticated, navigate, toast]);
 
   const handleGoogleLogin = async () => {
-    console.log("Google login button clicked");
+    console.log("=== Google login button clicked ===");
     setLoading(true);
     
     try {
@@ -102,7 +136,11 @@ export default function Login() {
       console.log("loginWithGoogle function completed - redirect should happen via OAuth");
       // No need to navigate here as the OAuth redirect will handle this
     } catch (error) {
-      console.error("Login failed with error:", error);
+      console.error("=== Login failed ===");
+      console.error("Error object:", error);
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+      
       toast({
         title: "Login failed",
         description: error instanceof Error ? error.message : "Failed to sign in with Google. Please try again.",
@@ -167,6 +205,26 @@ export default function Login() {
           </p>
         </CardFooter>
       </Card>
+
+      {/* Debug information section - only visible in development */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="mt-8 p-4 bg-gray-100 rounded-lg w-full max-w-md text-xs">
+          <h3 className="font-bold mb-2">OAuth Debug Info</h3>
+          <p>Environment: {process.env.NODE_ENV}</p>
+          <p>Current URL: {window.location.href}</p>
+          <p>Authentication Status: {isAuthenticated ? 'Authenticated' : 'Not Authenticated'}</p>
+          <p>Loading: {loading ? 'True' : 'False'}</p>
+          <details>
+            <summary className="cursor-pointer text-blue-500">Required OAuth Scopes</summary>
+            <ul className="pl-4 mt-1">
+              <li>https://www.googleapis.com/auth/userinfo.email</li>
+              <li>https://www.googleapis.com/auth/userinfo.profile</li>
+              <li>https://www.googleapis.com/auth/drive.file</li>
+              <li>openid</li>
+            </ul>
+          </details>
+        </div>
+      )}
     </div>
   );
 }

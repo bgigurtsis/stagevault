@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 const ROOT_FOLDER_NAME = "StageVault Recordings";
@@ -18,24 +17,62 @@ export interface UploadProgressCallback {
 class GoogleDriveService {
   private async getAccessToken(): Promise<string | null> {
     try {
+      console.log("=== Getting Google Drive Access Token ===");
+      
       const { data: { session }, error } = await supabase.auth.getSession();
       
-      if (error || !session) {
+      if (error) {
         console.error("Error getting session:", error);
         return null;
       }
+      
+      if (!session) {
+        console.error("No session found");
+        return null;
+      }
+      
+      console.log("Session exists, user ID:", session.user.id);
+      console.log("Provider:", session.user.app_metadata.provider);
       
       // Get the provider token (Google OAuth token)
       const providerToken = session.provider_token;
       
       if (!providerToken) {
-        console.error("No provider token found in session");
+        console.error("=== No provider token found in session ===");
+        console.log("Session object keys:", Object.keys(session));
+        console.log("User metadata:", session.user.user_metadata);
+        console.log("App metadata:", session.user.app_metadata);
+        
+        // If we have refresh token, we might be able to get a new token
+        if (session.refresh_token) {
+          console.log("We have refresh token, trying to refresh session");
+          
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+          
+          if (refreshError) {
+            console.error("Error refreshing session:", refreshError);
+            return null;
+          }
+          
+          if (refreshData.session?.provider_token) {
+            console.log("Got provider token after refresh!");
+            return refreshData.session.provider_token;
+          } else {
+            console.error("Still no provider token after refresh");
+            return null;
+          }
+        }
+        
         return null;
       }
       
+      console.log("Provider token found (first 20 chars):", providerToken.substring(0, 20) + "...");
       return providerToken;
     } catch (error) {
-      console.error("Error getting access token:", error);
+      console.error("=== Error getting access token ===");
+      console.error("Error type:", error.constructor.name);
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
       return null;
     }
   }
@@ -45,13 +82,25 @@ class GoogleDriveService {
    */
   private async findOrCreateFolder(folderName: string, parentFolderId?: string): Promise<string | null> {
     try {
+      console.log(`=== Finding/Creating folder: "${folderName}" ===`);
+      if (parentFolderId) {
+        console.log("Under parent folder ID:", parentFolderId);
+      } else {
+        console.log("Under root folder");
+      }
+      
       const accessToken = await this.getAccessToken();
-      if (!accessToken) return null;
+      if (!accessToken) {
+        console.error("No access token available for Google Drive operations");
+        return null;
+      }
       
       // First, try to find the folder
       const query = parentFolderId 
         ? `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and '${parentFolderId}' in parents and trashed=false`
         : `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and 'root' in parents and trashed=false`;
+      
+      console.log("Search query:", query);
       
       const searchResponse = await fetch(
         `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}`,
@@ -62,19 +111,32 @@ class GoogleDriveService {
         }
       );
       
+      if (!searchResponse.ok) {
+        console.error("Error searching for folder:", searchResponse.status, searchResponse.statusText);
+        const errorText = await searchResponse.text();
+        console.error("Error response:", errorText);
+        throw new Error(`Google Drive API error: ${searchResponse.status} ${searchResponse.statusText}`);
+      }
+      
       const searchData = await searchResponse.json();
+      console.log("Search results:", searchData);
       
       // If folder exists, return its ID
       if (searchData.files && searchData.files.length > 0) {
+        console.log(`Folder "${folderName}" found, ID:`, searchData.files[0].id);
         return searchData.files[0].id;
       }
       
       // Folder doesn't exist, create it
+      console.log(`Folder "${folderName}" not found, creating it`);
+      
       const metaData = {
         name: folderName,
         mimeType: 'application/vnd.google-apps.folder',
         parents: parentFolderId ? [parentFolderId] : ['root'],
       };
+      
+      console.log("Create folder metadata:", metaData);
       
       const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
         method: 'POST',
@@ -85,10 +147,21 @@ class GoogleDriveService {
         body: JSON.stringify(metaData),
       });
       
+      if (!createResponse.ok) {
+        console.error("Error creating folder:", createResponse.status, createResponse.statusText);
+        const errorText = await createResponse.text();
+        console.error("Error response:", errorText);
+        throw new Error(`Google Drive API error: ${createResponse.status} ${createResponse.statusText}`);
+      }
+      
       const folder = await createResponse.json();
+      console.log(`Folder "${folderName}" created, ID:`, folder.id);
       return folder.id;
     } catch (error) {
-      console.error("Error finding or creating folder:", error);
+      console.error("=== Error finding or creating folder ===");
+      console.error("Error type:", error.constructor.name);
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
       return null;
     }
   }
