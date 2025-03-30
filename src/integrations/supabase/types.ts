@@ -15,6 +15,7 @@ export type Database = {
           created_at: string
           created_by: string
           description: string | null
+          drive_folder_id: string | null
           end_date: string | null
           id: string
           start_date: string | null
@@ -27,6 +28,7 @@ export type Database = {
           created_at?: string
           created_by: string
           description?: string | null
+          drive_folder_id?: string | null
           end_date?: string | null
           id?: string
           start_date?: string | null
@@ -39,6 +41,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           description?: string | null
+          drive_folder_id?: string | null
           end_date?: string | null
           id?: string
           start_date?: string | null
@@ -103,6 +106,7 @@ export type Database = {
           created_at: string
           date: string
           description: string | null
+          drive_folder_id: string | null
           id: string
           location: string | null
           notes: string | null
@@ -115,6 +119,7 @@ export type Database = {
           created_at?: string
           date: string
           description?: string | null
+          drive_folder_id?: string | null
           id?: string
           location?: string | null
           notes?: string | null
@@ -127,6 +132,7 @@ export type Database = {
           created_at?: string
           date?: string
           description?: string | null
+          drive_folder_id?: string | null
           id?: string
           location?: string | null
           notes?: string | null
