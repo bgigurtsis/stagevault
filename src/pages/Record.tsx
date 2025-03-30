@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { 
@@ -8,12 +7,16 @@ import {
   Play, 
   StopCircle, 
   Save,
-  ArrowLeft
+  ArrowLeft,
+  Upload,
+  Check,
+  Clock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 import { 
   Select, 
   SelectContent, 
@@ -21,10 +24,13 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { performanceService } from "@/services/performanceService";
 import { rehearsalService } from "@/services/rehearsalService";
 import { recordingService } from "@/services/recordingService";
+import { googleDriveService } from "@/services/googleDriveService";
 import { Performance, Rehearsal } from "@/types";
 import "./Record.css";
 
@@ -42,6 +48,9 @@ export default function Record() {
   const [performances, setPerformances] = useState<Performance[]>([]);
   const [availableRehearsals, setAvailableRehearsals] = useState<Rehearsal[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadComplete, setUploadComplete] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -54,19 +63,16 @@ export default function Record() {
   const rehearsalIdParam = searchParams.get('rehearsalId');
   const { toast } = useToast();
   
-  // Fetch performances and rehearsals
   useEffect(() => {
     const fetchData = async () => {
       try {
         const performanceData = await performanceService.getPerformances();
         setPerformances(performanceData);
         
-        // If no rehearsal ID was provided in URL, fetch all rehearsals
         if (!rehearsalIdParam) {
           const rehearsalData = await rehearsalService.getAllRehearsals();
           setAvailableRehearsals(rehearsalData);
         } else {
-          // If a rehearsal ID was provided, fetch that specific rehearsal
           const rehearsal = await rehearsalService.getRehearsalById(rehearsalIdParam);
           if (rehearsal) {
             setSelectedRehearsal(rehearsal.id);
@@ -88,7 +94,6 @@ export default function Record() {
     fetchData();
   }, [rehearsalIdParam, toast]);
   
-  // Update available rehearsals when a performance is selected
   useEffect(() => {
     const updateRehearsals = async () => {
       if (selectedPerformance) {
@@ -96,7 +101,6 @@ export default function Record() {
           const rehearsals = await rehearsalService.getRehearsalsByPerformance(selectedPerformance);
           setAvailableRehearsals(rehearsals);
           
-          // If there are rehearsals and none is selected, select the first one
           if (rehearsals.length > 0 && !selectedRehearsal) {
             setSelectedRehearsal(rehearsals[0].id);
           }
@@ -114,7 +118,6 @@ export default function Record() {
     updateRehearsals();
   }, [selectedPerformance, selectedRehearsal, toast]);
   
-  // Clean up function for unmounting
   useEffect(() => {
     return () => {
       if (streamRef.current) {
@@ -232,6 +235,9 @@ export default function Record() {
       URL.revokeObjectURL(videoUrl);
     }
     setVideoUrl(null);
+    setUploadProgress(0);
+    setIsUploading(false);
+    setUploadComplete(false);
     
     if (videoRef.current) {
       videoRef.current.srcObject = null;
@@ -269,10 +275,35 @@ export default function Record() {
     }
     
     setIsLoading(true);
+    setIsUploading(true);
     
     try {
-      // In a production app, we would upload the blob to cloud storage
-      // For now, we'll create a recording without the actual video file
+      const rehearsal = availableRehearsals.find(r => r.id === selectedRehearsal);
+      if (!rehearsal) throw new Error("Rehearsal not found");
+      
+      const performance = performances.find(p => p.id === rehearsal.performanceId);
+      if (!performance) throw new Error("Performance not found");
+      
+      const fileExtension = "webm";
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const fileName = `${title.replace(/[^a-z0-9]/gi, "_")}_${timestamp}.${fileExtension}`;
+      
+      const driveFile = await googleDriveService.uploadVideo(
+        recordedBlob,
+        fileName,
+        performance.title,
+        rehearsal.title,
+        (progress) => {
+          setUploadProgress(progress);
+        }
+      );
+      
+      if (!driveFile) {
+        throw new Error("Failed to upload video to Google Drive");
+      }
+      
+      setUploadComplete(true);
+      
       const tagsArray = tags.split(',').map(tag => tag.trim()).filter(tag => tag !== '');
       
       await recordingService.createRecording({
@@ -281,22 +312,24 @@ export default function Record() {
         notes: notes || undefined,
         tags: tagsArray.length > 0 ? tagsArray : undefined,
         duration: recordingTime,
-        // In a real app, we would set videoUrl and thumbnailUrl after upload
-        // For now, we'll leave them undefined
+        videoUrl: driveFile.webViewLink,
+        thumbnailUrl: driveFile.thumbnailLink,
+        googleFileId: driveFile.id
       });
       
       toast({
         title: "Recording saved",
-        description: "Your recording has been saved successfully.",
+        description: "Your recording has been successfully uploaded to Google Drive and saved.",
       });
       
-      // Navigate to the rehearsal detail page
       navigate(`/rehearsals/${selectedRehearsal}`);
     } catch (error) {
       console.error("Error saving recording:", error);
+      setIsUploading(false);
+      
       toast({
         title: "Error",
-        description: "Failed to save recording. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to save recording. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -318,17 +351,50 @@ export default function Record() {
         </div>
         {recordedBlob && (
           <div className="flex gap-2">
-            <Button variant="outline" onClick={resetRecording}>
+            <Button variant="outline" onClick={resetRecording} disabled={isUploading}>
               <X className="mr-2 h-4 w-4" />
               Reset
             </Button>
-            <Button onClick={saveRecording} disabled={isLoading}>
-              <Save className="mr-2 h-4 w-4" />
-              {isLoading ? "Saving..." : "Save Recording"}
+            <Button 
+              onClick={saveRecording} 
+              disabled={isLoading || isUploading}
+              className={uploadComplete ? "bg-green-600 hover:bg-green-700" : ""}
+            >
+              {uploadComplete ? (
+                <>
+                  <Check className="mr-2 h-4 w-4" />
+                  Saved
+                </>
+              ) : isUploading ? (
+                <>
+                  <Upload className="mr-2 h-4 w-4 animate-pulse" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Recording
+                </>
+              )}
             </Button>
           </div>
         )}
       </div>
+      
+      {isUploading && (
+        <div className="bg-background border rounded-md p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Uploading to Google Drive</span>
+            <span className="text-sm text-muted-foreground">{Math.round(uploadProgress)}%</span>
+          </div>
+          <Progress value={uploadProgress} className="h-2" />
+          <p className="text-xs text-muted-foreground">
+            {uploadComplete ? 
+              "Upload complete! Saving recording details..." : 
+              "Please do not close this page while the video is uploading."}
+          </p>
+        </div>
+      )}
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
@@ -396,6 +462,13 @@ export default function Record() {
               </div>
             ) : null}
           </div>
+          
+          {recordedBlob && !isUploading && (
+            <div className="bg-muted/40 border rounded p-3 text-sm flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <span>Recording length: {formatTime(recordingTime)}</span>
+            </div>
+          )}
         </div>
         
         <div className="space-y-4">
@@ -415,7 +488,7 @@ export default function Record() {
             <Select
               value={selectedPerformance}
               onValueChange={setSelectedPerformance}
-              disabled={!!rehearsalIdParam}
+              disabled={!!rehearsalIdParam || isUploading}
             >
               <SelectTrigger id="performance">
                 <SelectValue placeholder="Select a performance" />
@@ -435,7 +508,7 @@ export default function Record() {
             <Select
               value={selectedRehearsal}
               onValueChange={setSelectedRehearsal}
-              disabled={!!rehearsalIdParam}
+              disabled={!!rehearsalIdParam || isUploading}
             >
               <SelectTrigger id="rehearsal">
                 <SelectValue placeholder="Select a rehearsal" />
@@ -458,6 +531,7 @@ export default function Record() {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={4}
+              disabled={isUploading}
             />
           </div>
           
@@ -468,11 +542,28 @@ export default function Record() {
               placeholder="Add tags separated by commas"
               value={tags}
               onChange={(e) => setTags(e.target.value)}
+              disabled={isUploading}
             />
             <p className="text-xs text-muted-foreground">
               E.g., solo, group, needs work
             </p>
           </div>
+          
+          {recordedBlob && !isUploading && (
+            <div className="mt-4">
+              <Button 
+                onClick={saveRecording} 
+                className="w-full" 
+                disabled={isLoading || !title || !selectedRehearsal}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Upload to Google Drive
+              </Button>
+              <p className="text-xs text-muted-foreground mt-2 text-center">
+                Your video will be securely stored in your Google Drive account
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
