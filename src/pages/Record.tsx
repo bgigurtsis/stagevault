@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { 
@@ -74,7 +75,7 @@ export default function Record() {
         
         if (!rehearsalIdParam) {
           const rehearsalData = await rehearsalService.getAllRehearsals();
-          setAvailableRehearsals(rehearsersalData);
+          setAvailableRehearsals(rehearsalData);
         } else {
           const rehearsal = await rehearsalService.getRehearsalById(rehearsalIdParam);
           if (rehearsal) {
