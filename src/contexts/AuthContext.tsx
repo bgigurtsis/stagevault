@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User as SupabaseUser } from "@supabase/supabase-js";
@@ -68,15 +69,23 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    console.log("AuthProvider initialized");
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log("Auth state changed:", event, session);
+        console.log("Auth state changed:", event, session ? "Session exists" : "No session");
+        if (session?.user) {
+          console.log("User found in session:", session.user.id);
+          console.log("User metadata:", JSON.stringify(session.user.user_metadata));
+        }
         setSession(session);
         
         if (session?.user) {
           const userInfo = extractUserInfo(session.user);
+          console.log("Extracted user info:", userInfo);
           setCurrentUser(userInfo);
         } else {
+          console.log("No user in session, setting currentUser to null");
           setCurrentUser(null);
         }
         
@@ -85,21 +94,30 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     );
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log("Initial session check:", session);
+      console.log("Initial session check:", session ? "Session exists" : "No session");
+      if (session?.user) {
+        console.log("Initial user found:", session.user.id);
+        console.log("Initial user metadata:", JSON.stringify(session.user.user_metadata));
+      }
       setSession(session);
       
       if (session?.user) {
         const userInfo = extractUserInfo(session.user);
+        console.log("Initial extracted user info:", userInfo);
         setCurrentUser(userInfo);
       }
       
       setIsLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log("Unsubscribing from auth state changes");
+      subscription.unsubscribe();
+    };
   }, []);
 
   const extractUserInfo = (user: SupabaseUser): User => {
+    console.log("Extracting user info for user:", user.id);
     return {
       id: user.id,
       name: user.user_metadata.name || user.user_metadata.full_name || user.email?.split("@")[0] || "User",
@@ -126,10 +144,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const loginWithGoogle = async () => {
     try {
-      const redirectTo = `${window.location.origin}/login`;
+      const currentUrl = window.location.origin;
+      const redirectTo = `${currentUrl}/login`;
+      console.log("Google login initiated");
+      console.log("Current URL:", currentUrl);
       console.log("Redirecting to:", redirectTo);
       
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { error, data } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectTo,
@@ -139,7 +160,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         }
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Google login error:", error);
+        throw error;
+      }
+      
+      console.log("Google OAuth response:", data);
     } catch (error) {
       console.error("Google login error:", error);
       throw error;
@@ -168,7 +194,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   const logout = async () => {
-    supabase.auth.signOut();
+    console.log("Logging out user");
+    await supabase.auth.signOut();
+    console.log("User logged out, setting currentUser to null");
     setCurrentUser(null);
   };
 

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -13,9 +12,13 @@ export default function Login() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  console.log("Login component rendered, isAuthenticated:", isAuthenticated);
+
   // Check for existing session and redirect if authenticated
   useEffect(() => {
+    console.log("Login - auth status check useEffect, isAuthenticated:", isAuthenticated);
     if (isAuthenticated) {
+      console.log("User is authenticated, redirecting to home page");
       navigate("/");
       toast({
         title: "Welcome back!",
@@ -28,20 +31,41 @@ export default function Login() {
   useEffect(() => {
     // Check for hash parameters (access_token, etc.) which indicates a successful OAuth redirect
     const hash = window.location.hash;
-    if (hash && hash.includes("access_token")) {
-      console.log("Auth redirect detected, clearing hash");
-      // Clear the hash from the URL to avoid issues on refresh
-      window.history.replaceState(null, document.title, window.location.pathname);
+    console.log("Checking URL hash for auth tokens:", hash ? "Hash exists" : "No hash");
+    
+    if (hash) {
+      console.log("Full hash string:", hash);
+      
+      if (hash.includes("access_token")) {
+        console.log("Access token found in hash");
+        // Clear the hash from the URL to avoid issues on refresh
+        window.history.replaceState(null, document.title, window.location.pathname);
+        console.log("URL hash cleared");
+      }
+      
+      // Log all parameters in the hash for debugging
+      const hashParams = new URLSearchParams(hash.substring(1));
+      for (const [key, value] of hashParams.entries()) {
+        console.log(`Hash parameter: ${key} = ${value.substring(0, 10)}...`);
+      }
     }
+    
+    // Log the current path
+    console.log("Current path:", window.location.pathname);
+    console.log("Current full URL:", window.location.href);
   }, []);
 
   const handleGoogleLogin = async () => {
+    console.log("Google login button clicked");
     setLoading(true);
     
     try {
+      console.log("Calling loginWithGoogle function");
       await loginWithGoogle();
+      console.log("loginWithGoogle function completed - redirect should happen via OAuth");
       // No need to navigate here as the OAuth redirect will handle this
     } catch (error) {
+      console.error("Login failed with error:", error);
       toast({
         title: "Login failed",
         description: error instanceof Error ? error.message : "Failed to sign in with Google. Please try again.",
