@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { 
   Theater, 
@@ -13,15 +12,69 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
-import { mockPerformances, mockRehearsals, mockRecordings } from "@/types";
+import { Performance, Recording } from "@/types";
+import { performanceService } from "@/services/performanceService";
+import { recordingService } from "@/services/recordingService";
+import { useToast } from "@/hooks/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Dashboard() {
   const { currentUser } = useAuth();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
+  const [performances, setPerformances] = useState<Performance[]>([]);
+  const [recordings, setRecordings] = useState<Recording[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
-  // Filter to only show recent items (in a real app, these would be sorted by date)
-  const recentPerformances = mockPerformances.slice(0, 3);
-  const recentRecordings = mockRecordings.slice(0, 3); // Show same number as performances
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      setIsLoading(true);
+      try {
+        const performancesData = await performanceService.getPerformances();
+        setPerformances(performancesData);
+        
+        const allRehearsalIds = performancesData.flatMap(perf => 
+          Array(3).fill(perf.id)
+        );
+        
+        let recordingsData: Recording[] = [];
+        if (allRehearsalIds.length > 0) {
+          const recordingsPromises = allRehearsalIds.slice(0, 3).map(async (rehearsalId) => {
+            try {
+              const recordings = await recordingService.getRecordingsByRehearsalId(rehearsalId);
+              return recordings;
+            } catch (error) {
+              console.error(`Error fetching recordings for rehearsal ${rehearsalId}:`, error);
+              return [];
+            }
+          });
+          
+          const recordingResults = await Promise.all(recordingsPromises);
+          recordingsData = recordingResults.flat();
+          
+          recordingsData.sort((a, b) => 
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+        }
+        
+        setRecordings(recordingsData);
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+        toast({
+          title: "Error loading data",
+          description: "There was a problem loading your dashboard data.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchDashboardData();
+  }, [toast]);
+  
+  const recentPerformances = performances.slice(0, 3);
+  const recentRecordings = recordings.slice(0, 3);
   
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -37,11 +90,54 @@ export default function Dashboard() {
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
+  if (isLoading) {
+    return (
+      <div className="container max-w-6xl py-6 space-y-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <Skeleton className="h-10 w-64" />
+            <Skeleton className="h-5 w-96 mt-2" />
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-10 w-48" />
+            <Skeleton className="h-10 w-48" />
+          </div>
+        </div>
+        
+        <Skeleton className="h-14 w-full" />
+        
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-5 w-24" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-72 w-full" />
+            ))}
+          </div>
+        </div>
+        
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-5 w-24" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-72 w-full" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container max-w-6xl py-6 space-y-8">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Welcome back, {currentUser?.name.split(' ')[0]}</h1>
+          <h1 className="text-3xl font-bold">Welcome back, {currentUser?.name?.split(' ')[0] || 'User'}</h1>
           <p className="text-muted-foreground mt-1">
             Manage your dance performances, rehearsals, and recordings
           </p>
@@ -59,7 +155,6 @@ export default function Dashboard() {
         </div>
       </div>
       
-      {/* Global Search Bar - replacing stats section */}
       <div className="relative">
         <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
         <Input
@@ -70,7 +165,6 @@ export default function Dashboard() {
         />
       </div>
       
-      {/* Recent performances */}
       <div>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold">Recent Performances</h2>
@@ -141,7 +235,6 @@ export default function Dashboard() {
         )}
       </div>
       
-      {/* Recent recordings - updated to match performance card style */}
       <div>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold">Recent Recordings</h2>
