@@ -11,6 +11,8 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Performances from "./pages/Performances";
 import PerformanceDetail from "./pages/PerformanceDetail";
+import PerformanceNew from "./pages/PerformanceNew";
+import PerformanceEdit from "./pages/PerformanceEdit";
 import Rehearsals from "./pages/Rehearsals";
 import RehearsalDetail from "./pages/RehearsalDetail";
 import Record from "./pages/Record";
@@ -31,7 +33,9 @@ const App = () => (
             <Route element={<Layout />}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/performances" element={<Performances />} />
+              <Route path="/performances/new" element={<PerformanceNew />} />
               <Route path="/performances/:performanceId" element={<PerformanceDetail />} />
+              <Route path="/performances/:performanceId/edit" element={<PerformanceEdit />} />
               <Route path="/rehearsals" element={<Rehearsals />} />
               <Route path="/rehearsals/:rehearsalId" element={<RehearsalDetail />} />
               <Route path="/record" element={<Record />} />

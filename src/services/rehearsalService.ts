@@ -17,6 +17,31 @@ export interface UpdateRehearsalData extends Partial<CreateRehearsalData> {
 }
 
 export class RehearsalService extends BaseService {
+  async getRehearsals(): Promise<Rehearsal[]> {
+    const { data, error } = await this.supabase
+      .from("rehearsals")
+      .select("*")
+      .order("date", { ascending: false });
+    
+    if (error) {
+      console.error("Error fetching rehearsals:", error);
+      return [];
+    }
+    
+    return data.map(r => ({
+      id: r.id,
+      performanceId: r.performance_id,
+      title: r.title,
+      description: r.description || undefined,
+      date: r.date,
+      location: r.location || undefined,
+      notes: r.notes || undefined,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+      taggedUsers: r.tagged_users || []
+    }));
+  }
+  
   async getRehearsalsByPerformanceId(performanceId: string): Promise<Rehearsal[]> {
     const { data, error } = await this.supabase
       .from("rehearsals")
@@ -36,10 +61,10 @@ export class RehearsalService extends BaseService {
       description: r.description || undefined,
       date: r.date,
       location: r.location || undefined,
+      notes: r.notes || undefined,
       createdAt: r.created_at,
       updatedAt: r.updated_at,
-      taggedUsers: r.tagged_users || [],
-      notes: r.notes || undefined
+      taggedUsers: r.tagged_users || []
     }));
   }
   
@@ -62,10 +87,10 @@ export class RehearsalService extends BaseService {
       description: data.description || undefined,
       date: data.date,
       location: data.location || undefined,
+      notes: data.notes || undefined,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
-      taggedUsers: data.tagged_users || [],
-      notes: data.notes || undefined
+      taggedUsers: data.tagged_users || []
     };
   }
   
@@ -96,18 +121,18 @@ export class RehearsalService extends BaseService {
       description: data.description || undefined,
       date: data.date,
       location: data.location || undefined,
+      notes: data.notes || undefined,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
-      taggedUsers: data.tagged_users || [],
-      notes: data.notes || undefined
+      taggedUsers: data.tagged_users || []
     };
   }
   
   async updateRehearsal(rehearsalData: UpdateRehearsalData): Promise<Rehearsal | null> {
     const updateData: any = {};
     
-    if (rehearsalData.title !== undefined) updateData.title = rehearsalData.title;
     if (rehearsalData.performanceId !== undefined) updateData.performance_id = rehearsalData.performanceId;
+    if (rehearsalData.title !== undefined) updateData.title = rehearsalData.title;
     if (rehearsalData.description !== undefined) updateData.description = rehearsalData.description;
     if (rehearsalData.date !== undefined) updateData.date = rehearsalData.date;
     if (rehearsalData.location !== undefined) updateData.location = rehearsalData.location;
@@ -133,10 +158,10 @@ export class RehearsalService extends BaseService {
       description: data.description || undefined,
       date: data.date,
       location: data.location || undefined,
+      notes: data.notes || undefined,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
-      taggedUsers: data.tagged_users || [],
-      notes: data.notes || undefined
+      taggedUsers: data.tagged_users || []
     };
   }
   
