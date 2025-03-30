@@ -1,5 +1,6 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Session, User as SupabaseUser } from "@supabase/supabase-js";
 
 export interface User {
   id: string;
@@ -15,6 +16,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   signup: (name: string, email: string, password: string, role?: "performer" | "choreographer") => Promise<void>;
   logout: () => void;
 }
@@ -51,6 +53,7 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   isAuthenticated: false,
   login: async () => {},
+  loginWithGoogle: async () => {},
   signup: async () => {},
   logout: () => {}
 });
@@ -63,22 +66,52 @@ interface AuthProviderProps {
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Simulate loading user data on mount
+  // Initialize auth state
   useEffect(() => {
-    const loadUser = async () => {
-      // In a real app, you would check for a stored token or session
-      // and possibly make an API request to get the current user data
-      setTimeout(() => {
-        // Simulate logged in user (first user in our mock data)
-        setCurrentUser(mockUsers[0]);
+    // Set up auth state listener first
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setSession(session);
+        
+        if (session?.user) {
+          const userInfo = extractUserInfo(session.user);
+          setCurrentUser(userInfo);
+        } else {
+          setCurrentUser(null);
+        }
+        
         setIsLoading(false);
-      }, 1000);
-    };
+      }
+    );
 
-    loadUser();
+    // Then check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      
+      if (session?.user) {
+        const userInfo = extractUserInfo(session.user);
+        setCurrentUser(userInfo);
+      }
+      
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
+
+  // Helper function to extract user info from Supabase user
+  const extractUserInfo = (user: SupabaseUser): User => {
+    return {
+      id: user.id,
+      name: user.user_metadata.name || user.user_metadata.full_name || user.email?.split("@")[0] || "User",
+      email: user.email || "",
+      profilePicture: user.user_metadata.avatar_url || user.user_metadata.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.user_metadata.name || user.email?.split("@")[0] || "User")}&background=random`,
+      role: user.user_metadata.role || "performer"
+    };
+  };
 
   const login = async (email: string, password: string) => {
     // In a real app, you would make an API request to validate credentials
@@ -99,6 +132,21 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
     
     setIsLoading(false);
+  };
+
+  const loginWithGoogle = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/`,
+        }
+      });
+      
+      if (error) throw error;
+    } catch (error) {
+      throw error;
+    }
   };
 
   const signup = async (name: string, email: string, password: string, role?: "performer" | "choreographer") => {
@@ -132,6 +180,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const logout = () => {
     // In a real app, you would clear the token/session
+    supabase.auth.signOut();
     setCurrentUser(null);
   };
 
@@ -141,6 +190,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     isLoading,
     isAuthenticated: !!currentUser,
     login,
+    loginWithGoogle,
     signup,
     logout
   };
