@@ -595,7 +595,7 @@ export default function Record() {
       logDebug("Uploading video to Google Drive", {
         rehearsalTitle: rehearsal.title,
         performanceTitle: performance.title,
-        driveFolderId: rehearsal.drive_folder_id || "Not set"
+        driveFolderId: rehearsal.driveFolderId || "Not set"
       });
       
       const driveFile = await googleDriveService.uploadVideo(
@@ -606,7 +606,7 @@ export default function Record() {
         (progress) => {
           setUploadProgress(progress);
         },
-        rehearsal.drive_folder_id
+        rehearsal.driveFolderId
       );
       
       if (!driveFile) {
