@@ -12,7 +12,8 @@ import {
   Upload,
   Check,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Camera
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,6 +56,8 @@ export default function Record() {
   const [uploadPhase, setUploadPhase] = useState<'preparing' | 'uploading' | 'processing' | 'saving' | 'complete' | 'error'>('preparing');
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [cameraAccessError, setCameraAccessError] = useState<string | null>(null);
+  const [isInitializingCamera, setIsInitializingCamera] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -144,7 +147,16 @@ export default function Record() {
   
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      setCameraAccessError(null);
+      setIsInitializingCamera(true);
+      
+      // Create a timeout promise to abort if it takes too long
+      const timeoutPromise = new Promise<MediaStream>((_, reject) => {
+        setTimeout(() => reject(new Error("Camera access timeout - please check your browser settings")), 10000);
+      });
+      
+      // Request camera access with explicit constraints
+      const accessPromise = navigator.mediaDevices.getUserMedia({ 
         video: { 
           width: { ideal: 1280 },
           height: { ideal: 720 },
@@ -153,20 +165,31 @@ export default function Record() {
         audio: true 
       });
       
+      // Race the promises to handle timeout
+      const stream = await Promise.race([accessPromise, timeoutPromise]);
+      
+      console.log("Camera access granted successfully");
+      setIsInitializingCamera(false);
       streamRef.current = stream;
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play().catch(err => {
+            console.error("Error playing video:", err);
+            setCameraAccessError("Error playing video stream. Please refresh and try again.");
+          });
+        };
       }
       
       chunksRef.current = [];
       
+      // Find supported mime type
+      const mimeType = getSupportedMimeType();
+      console.log("Using mime type:", mimeType);
+      
       const options: MediaRecorderOptions = {
-        mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9') 
-          ? 'video/webm;codecs=vp9'
-          : MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
-            ? 'video/webm;codecs=vp8'
-            : 'video/webm',
+        mimeType: mimeType,
         audioBitsPerSecond: 128000,
         videoBitsPerSecond: 2500000
       };
@@ -181,7 +204,7 @@ export default function Record() {
       };
       
       mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+        const blob = new Blob(chunksRef.current, { type: mimeType });
         const url = URL.createObjectURL(blob);
         setRecordedBlob(blob);
         setVideoUrl(url);
@@ -203,12 +226,55 @@ export default function Record() {
       
     } catch (error) {
       console.error("Error accessing media devices:", error);
+      setIsInitializingCamera(false);
+      
+      let errorMessage = "Failed to access camera and microphone.";
+      
+      if (error instanceof Error) {
+        console.error("Error message:", error.message);
+        console.error("Error name:", error.name);
+        
+        if (error.name === "NotAllowedError" || error.message.includes("Permission denied")) {
+          errorMessage = "Camera access denied. Please allow access in your browser settings.";
+        } else if (error.name === "NotFoundError" || error.message.includes("Requested device not found")) {
+          errorMessage = "No camera detected. Please connect a camera and try again.";
+        } else if (error.name === "NotReadableError" || error.message.includes("The device is in use")) {
+          errorMessage = "Camera is in use by another application. Please close other apps using your camera.";
+        } else if (error.name === "AbortError" || error.message.includes("Timeout")) {
+          errorMessage = "Camera access timed out. Your browser may have blocked access.";
+        } else if (error.name === "TypeError" || error.message.includes("constraint")) {
+          errorMessage = "Your camera doesn't support the required quality settings. Try a different device.";
+        }
+      }
+      
+      setCameraAccessError(errorMessage);
+      
       toast({
-        title: "Camera access denied",
-        description: "Please allow access to your camera and microphone to record.",
+        title: "Camera access failed",
+        description: errorMessage,
         variant: "destructive",
       });
     }
+  };
+  
+  // Helper function to determine supported mime type
+  const getSupportedMimeType = () => {
+    const types = [
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp9',
+      'video/webm;codecs=vp8,opus',
+      'video/webm;codecs=vp8',
+      'video/webm',
+      'video/mp4'
+    ];
+    
+    for (const type of types) {
+      if (MediaRecorder.isTypeSupported(type)) {
+        return type;
+      }
+    }
+    
+    return 'video/webm'; // fallback
   };
   
   const pauseRecording = () => {
@@ -256,6 +322,7 @@ export default function Record() {
     setUploadProgress(0);
     setIsUploading(false);
     setUploadComplete(false);
+    setCameraAccessError(null);
     
     if (videoRef.current) {
       videoRef.current.srcObject = null;
@@ -543,7 +610,7 @@ export default function Record() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-muted rounded-lg overflow-hidden relative aspect-video">
-            {!isRecording && !recordedBlob && (
+            {!isRecording && !recordedBlob && !cameraAccessError && !isInitializingCamera && (
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <Video className="h-12 w-12 text-muted-foreground/50 mb-2" />
                 <p className="text-muted-foreground font-medium">
@@ -554,11 +621,48 @@ export default function Record() {
                 </p>
               </div>
             )}
+            
+            {isInitializingCamera && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <div className="animate-pulse flex flex-col items-center">
+                  <Camera className="h-12 w-12 text-primary mb-2" />
+                  <p className="text-primary font-medium">
+                    Initializing camera...
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Please allow camera access when prompted
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            {cameraAccessError && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-w-md">
+                  <div className="flex gap-3 items-start">
+                    <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                    <div>
+                      <h3 className="font-semibold text-red-900">Camera Access Error</h3>
+                      <p className="text-red-700 mt-1 text-sm">{cameraAccessError}</p>
+                      <div className="mt-3 flex flex-col gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setCameraAccessError(null)}>
+                          Try Again
+                        </Button>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Make sure your camera is connected and you've allowed browser permissions
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <video
               ref={videoRef}
               autoPlay
-              muted={isRecording} // Mute only during recording to prevent feedback
               playsInline
+              muted={isRecording} // Mute only during recording to prevent feedback
               className="w-full h-full object-cover"
             />
             
@@ -576,6 +680,7 @@ export default function Record() {
                 onClick={startRecording} 
                 className="record-btn"
                 aria-label="Start recording"
+                disabled={isInitializingCamera}
               >
                 <div className="record-btn-inner" />
               </button>
