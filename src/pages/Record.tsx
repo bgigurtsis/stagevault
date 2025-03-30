@@ -1,6 +1,6 @@
 
 import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { 
   Video, 
   X, 
@@ -22,7 +22,11 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { mockPerformances, mockRehearsals } from "@/types";
+import { performanceService } from "@/services/performanceService";
+import { rehearsalService } from "@/services/rehearsalService";
+import { recordingService } from "@/services/recordingService";
+import { Performance, Rehearsal } from "@/types";
+import "./Record.css";
 
 export default function Record() {
   const [title, setTitle] = useState("");
@@ -35,7 +39,9 @@ export default function Record() {
   const [recordingTime, setRecordingTime] = useState(0);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [availableRehearsals, setAvailableRehearsals] = useState(mockRehearsals);
+  const [performances, setPerformances] = useState<Performance[]>([]);
+  const [availableRehearsals, setAvailableRehearsals] = useState<Rehearsal[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -44,14 +50,72 @@ export default function Record() {
   const timerRef = useRef<number | null>(null);
   
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const rehearsalIdParam = searchParams.get('rehearsalId');
   const { toast } = useToast();
   
-  const filteredRehearsals = selectedPerformance 
-    ? mockRehearsals.filter(rehearsal => rehearsal.performanceId === selectedPerformance)
-    : [];
-  
+  // Fetch performances and rehearsals
   useEffect(() => {
-    // Clean up when component unmounts
+    const fetchData = async () => {
+      try {
+        const performanceData = await performanceService.getPerformances();
+        setPerformances(performanceData);
+        
+        // If no rehearsal ID was provided in URL, fetch all rehearsals
+        if (!rehearsalIdParam) {
+          const rehearsalData = await rehearsalService.getAllRehearsals();
+          setAvailableRehearsals(rehearsalData);
+        } else {
+          // If a rehearsal ID was provided, fetch that specific rehearsal
+          const rehearsal = await rehearsalService.getRehearsalById(rehearsalIdParam);
+          if (rehearsal) {
+            setSelectedRehearsal(rehearsal.id);
+            setSelectedPerformance(rehearsal.performanceId);
+            const filteredRehearsals = await rehearsalService.getRehearsalsByPerformance(rehearsal.performanceId);
+            setAvailableRehearsals(filteredRehearsals);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load performances and rehearsals. Please try again.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    fetchData();
+  }, [rehearsalIdParam, toast]);
+  
+  // Update available rehearsals when a performance is selected
+  useEffect(() => {
+    const updateRehearsals = async () => {
+      if (selectedPerformance) {
+        try {
+          const rehearsals = await rehearsalService.getRehearsalsByPerformance(selectedPerformance);
+          setAvailableRehearsals(rehearsals);
+          
+          // If there are rehearsals and none is selected, select the first one
+          if (rehearsals.length > 0 && !selectedRehearsal) {
+            setSelectedRehearsal(rehearsals[0].id);
+          }
+        } catch (error) {
+          console.error("Error fetching rehearsals for performance:", error);
+          toast({
+            title: "Error",
+            description: "Failed to load rehearsals for this performance.",
+            variant: "destructive",
+          });
+        }
+      }
+    };
+
+    updateRehearsals();
+  }, [selectedPerformance, selectedRehearsal, toast]);
+  
+  // Clean up function for unmounting
+  useEffect(() => {
     return () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
@@ -59,16 +123,11 @@ export default function Record() {
       if (timerRef.current) {
         window.clearInterval(timerRef.current);
       }
+      if (videoUrl) {
+        URL.revokeObjectURL(videoUrl);
+      }
     };
-  }, []);
-  
-  useEffect(() => {
-    if (selectedPerformance && filteredRehearsals.length > 0) {
-      setAvailableRehearsals(filteredRehearsals);
-    } else {
-      setAvailableRehearsals(mockRehearsals);
-    }
-  }, [selectedPerformance, filteredRehearsals]);
+  }, [videoUrl]);
   
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -169,6 +228,9 @@ export default function Record() {
     stopRecording();
     setRecordingTime(0);
     setRecordedBlob(null);
+    if (videoUrl) {
+      URL.revokeObjectURL(videoUrl);
+    }
     setVideoUrl(null);
     
     if (videoRef.current) {
@@ -178,7 +240,7 @@ export default function Record() {
     }
   };
   
-  const saveRecording = () => {
+  const saveRecording = async () => {
     if (!title) {
       toast({
         title: "Title required",
@@ -206,24 +268,48 @@ export default function Record() {
       return;
     }
     
-    // In a real app, we would upload the blob to storage
-    toast({
-      title: "Recording saved!",
-      description: "Your recording has been saved successfully.",
-    });
+    setIsLoading(true);
     
-    // Navigate to the rehearsal detail page
-    navigate(`/rehearsals/${selectedRehearsal}`);
+    try {
+      // In a production app, we would upload the blob to cloud storage
+      // For now, we'll create a recording without the actual video file
+      const tagsArray = tags.split(',').map(tag => tag.trim()).filter(tag => tag !== '');
+      
+      await recordingService.createRecording({
+        rehearsalId: selectedRehearsal,
+        title: title,
+        notes: notes || undefined,
+        tags: tagsArray.length > 0 ? tagsArray : undefined,
+        duration: recordingTime,
+        // In a real app, we would set videoUrl and thumbnailUrl after upload
+        // For now, we'll leave them undefined
+      });
+      
+      toast({
+        title: "Recording saved",
+        description: "Your recording has been saved successfully.",
+      });
+      
+      // Navigate to the rehearsal detail page
+      navigate(`/rehearsals/${selectedRehearsal}`);
+    } catch (error) {
+      console.error("Error saving recording:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save recording. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <div className="container max-w-6xl py-6 space-y-6">
       <div className="flex flex-col sm:flex-row justify-between gap-4">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" asChild>
-            <div onClick={() => navigate(-1)}>
-              <ArrowLeft className="h-5 w-5" />
-            </div>
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-5 w-5" />
           </Button>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Video className="h-6 w-6 text-destructive" />
@@ -236,9 +322,9 @@ export default function Record() {
               <X className="mr-2 h-4 w-4" />
               Reset
             </Button>
-            <Button onClick={saveRecording}>
+            <Button onClick={saveRecording} disabled={isLoading}>
               <Save className="mr-2 h-4 w-4" />
-              Save Recording
+              {isLoading ? "Saving..." : "Save Recording"}
             </Button>
           </div>
         )}
@@ -329,12 +415,13 @@ export default function Record() {
             <Select
               value={selectedPerformance}
               onValueChange={setSelectedPerformance}
+              disabled={!!rehearsalIdParam}
             >
               <SelectTrigger id="performance">
                 <SelectValue placeholder="Select a performance" />
               </SelectTrigger>
               <SelectContent>
-                {mockPerformances.map((performance) => (
+                {performances.map((performance) => (
                   <SelectItem key={performance.id} value={performance.id}>
                     {performance.title}
                   </SelectItem>
@@ -348,6 +435,7 @@ export default function Record() {
             <Select
               value={selectedRehearsal}
               onValueChange={setSelectedRehearsal}
+              disabled={!!rehearsalIdParam}
             >
               <SelectTrigger id="rehearsal">
                 <SelectValue placeholder="Select a rehearsal" />
