@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { 
@@ -13,7 +12,9 @@ import {
   Check,
   Clock,
   AlertCircle,
-  Camera
+  Camera,
+  Bug,
+  RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,21 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
 import { useToast } from "@/hooks/use-toast";
 import { performanceService } from "@/services/performanceService";
 import { rehearsalService } from "@/services/rehearsalService";
@@ -58,6 +74,14 @@ export default function Record() {
   const [retryCount, setRetryCount] = useState(0);
   const [cameraAccessError, setCameraAccessError] = useState<string | null>(null);
   const [isInitializingCamera, setIsInitializingCamera] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<Record<string, any>>({});
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
+  const [showDebugDialog, setShowDebugDialog] = useState(false);
+  const [cameraAccessTimeout, setCameraAccessTimeout] = useState(10000);
+  const [usingFallbackMode, setUsingFallbackMode] = useState(false);
+  const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string>("");
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -70,113 +94,138 @@ export default function Record() {
   const rehearsalIdParam = searchParams.get('rehearsalId');
   const { toast } = useToast();
   
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const performanceData = await performanceService.getPerformances();
-        setPerformances(performanceData);
-        
-        if (!rehearsalIdParam) {
-          const rehearsalData = await rehearsalService.getAllRehearsals();
-          setAvailableRehearsals(rehearsalData);
-        } else {
-          const rehearsal = await rehearsalService.getRehearsalById(rehearsalIdParam);
-          if (rehearsal) {
-            setSelectedRehearsal(rehearsal.id);
-            setSelectedPerformance(rehearsal.performanceId);
-            const filteredRehearsals = await rehearsalService.getRehearsalsByPerformance(rehearsal.performanceId);
-            setAvailableRehearsals(filteredRehearsals);
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load performances and rehearsals. Please try again.",
-          variant: "destructive",
-        });
+  const logDebug = (message: string, data?: any) => {
+    const timestamp = new Date().toISOString();
+    const logMessage = `${timestamp} - ${message}`;
+    console.log(logMessage, data);
+    
+    if (debugMode) {
+      setDebugLogs(prev => [...prev, data ? `${logMessage}: ${JSON.stringify(data)}` : logMessage]);
+      
+      if (data) {
+        setDebugInfo(prev => ({
+          ...prev,
+          [message]: data
+        }));
       }
-    };
-
-    fetchData();
-  }, [rehearsalIdParam, toast]);
+    }
+  };
   
-  useEffect(() => {
-    const updateRehearsals = async () => {
-      if (selectedPerformance) {
-        try {
-          const rehearsals = await rehearsalService.getRehearsalsByPerformance(selectedPerformance);
-          setAvailableRehearsals(rehearsals);
-          
-          if (rehearsals.length > 0 && !selectedRehearsal) {
-            setSelectedRehearsal(rehearsals[0].id);
-          }
-        } catch (error) {
-          console.error("Error fetching rehearsals for performance:", error);
-          toast({
-            title: "Error",
-            description: "Failed to load rehearsals for this performance.",
-            variant: "destructive",
-          });
-        }
+  const enumerateDevices = async () => {
+    try {
+      logDebug("Enumerating devices");
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      
+      logDebug("Available video devices", videoDevices);
+      setAvailableCameras(videoDevices);
+      
+      if (videoDevices.length > 0 && !selectedCameraId) {
+        setSelectedCameraId(videoDevices[0].deviceId);
+        logDebug("Selected default camera", videoDevices[0].deviceId);
       }
-    };
-
-    updateRehearsals();
-  }, [selectedPerformance, selectedRehearsal, toast]);
+      
+      return videoDevices;
+    } catch (error) {
+      logDebug("Error enumerating devices", error);
+      return [];
+    }
+  };
   
-  useEffect(() => {
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
-      if (timerRef.current) {
-        window.clearInterval(timerRef.current);
-      }
-      if (videoUrl) {
-        URL.revokeObjectURL(videoUrl);
-      }
+  const checkBrowserCompatibility = () => {
+    const compatibility = {
+      userMediaSupported: !!navigator.mediaDevices?.getUserMedia,
+      mediaRecorderSupported: typeof MediaRecorder !== 'undefined',
+      enumerateDevicesSupported: !!navigator.mediaDevices?.enumerateDevices,
+      screenshareSupported: !!navigator.mediaDevices?.getDisplayMedia,
+      browserName: getBrowserName(),
+      isMobile: /iPhone|iPad|iPod|Android/i.test(navigator.userAgent),
+      secureContext: window.isSecureContext
     };
-  }, [videoUrl]);
+    
+    logDebug("Browser compatibility", compatibility);
+    
+    if (!compatibility.userMediaSupported || !compatibility.mediaRecorderSupported) {
+      setCameraAccessError("Your browser doesn't support media recording. Please try a modern browser like Chrome, Firefox, or Edge.");
+    }
+    
+    if (!compatibility.secureContext) {
+      setCameraAccessError("Camera access requires a secure connection (HTTPS). Please ensure you're using a secure connection.");
+    }
+    
+    return compatibility;
+  };
   
-  const formatTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  const getBrowserName = () => {
+    const userAgent = navigator.userAgent;
+    let browserName;
+    
+    if (userAgent.match(/chrome|chromium|crios/i)) {
+      browserName = "Chrome";
+    } else if (userAgent.match(/firefox|fxios/i)) {
+      browserName = "Firefox";
+    } else if (userAgent.match(/safari/i)) {
+      browserName = "Safari";
+    } else if (userAgent.match(/opr\//i)) {
+      browserName = "Opera";
+    } else if (userAgent.match(/edg/i)) {
+      browserName = "Edge";
+    } else {
+      browserName = "Unknown";
+    }
+    
+    return browserName;
   };
   
   const startRecording = async () => {
     try {
       setCameraAccessError(null);
       setIsInitializingCamera(true);
+      setDebugLogs([]);
       
-      // Create a timeout promise to abort if it takes too long
+      logDebug("Starting camera initialization");
+      
       const timeoutPromise = new Promise<MediaStream>((_, reject) => {
-        setTimeout(() => reject(new Error("Camera access timeout - please check your browser settings")), 10000);
+        setTimeout(() => {
+          logDebug("Camera access timeout reached", { timeout: cameraAccessTimeout });
+          reject(new Error("Camera access timeout - please check your browser settings"));
+        }, cameraAccessTimeout);
       });
       
-      // Request camera access with explicit constraints
-      const accessPromise = navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          frameRate: { ideal: 30 }
-        }, 
-        audio: true 
-      });
+      await enumerateDevices();
       
-      // Race the promises to handle timeout
+      const accessPromise = tryAccessCamera(1, selectedCameraId || undefined);
+      
       const stream = await Promise.race([accessPromise, timeoutPromise]);
       
-      console.log("Camera access granted successfully");
+      const videoTrack = stream.getVideoTracks()[0];
+      const audioTrack = stream.getAudioTracks()[0];
+      
+      const trackInfo = {
+        videoTrack: videoTrack ? {
+          label: videoTrack.label,
+          settings: videoTrack.getSettings(),
+          constraints: videoTrack.getConstraints(),
+          capabilities: videoTrack.getCapabilities ? videoTrack.getCapabilities() : 'Not supported'
+        } : null,
+        audioTrack: audioTrack ? {
+          label: audioTrack.label,
+          settings: audioTrack.getSettings(),
+          constraints: audioTrack.getConstraints(),
+          capabilities: audioTrack.getCapabilities ? audioTrack.getCapabilities() : 'Not supported'
+        } : null
+      };
+      
+      logDebug("Camera access granted successfully", trackInfo);
       setIsInitializingCamera(false);
       streamRef.current = stream;
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.onloadedmetadata = () => {
+          logDebug("Video metadata loaded");
           videoRef.current?.play().catch(err => {
-            console.error("Error playing video:", err);
+            logDebug("Error playing video", err);
             setCameraAccessError("Error playing video stream. Please refresh and try again.");
           });
         };
@@ -184,9 +233,8 @@ export default function Record() {
       
       chunksRef.current = [];
       
-      // Find supported mime type
       const mimeType = getSupportedMimeType();
-      console.log("Using mime type:", mimeType);
+      logDebug("Using mime type", mimeType);
       
       const options: MediaRecorderOptions = {
         mimeType: mimeType,
@@ -195,6 +243,166 @@ export default function Record() {
       };
       
       const mediaRecorder = new MediaRecorder(stream, options);
+      mediaRecorderRef.current = mediaRecorder;
+      
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunksRef.current.push(e.data);
+          logDebug("Received data chunk", { size: e.data.size, timestamp: new Date().toISOString() });
+        }
+      };
+      
+      mediaRecorder.onstop = () => {
+        logDebug("Media recorder stopped");
+        const blob = new Blob(chunksRef.current, { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        setRecordedBlob(blob);
+        setVideoUrl(url);
+        
+        if (videoRef.current) {
+          videoRef.current.srcObject = null;
+          videoRef.current.src = url;
+          videoRef.current.controls = true;
+        }
+      };
+      
+      mediaRecorder.start(1000);
+      logDebug("Media recorder started");
+      setIsRecording(true);
+      setIsPaused(false);
+      
+      timerRef.current = window.setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+      
+    } catch (error) {
+      console.error("Error accessing media devices:", error);
+      setIsInitializingCamera(false);
+      
+      let errorMessage = "Failed to access camera and microphone.";
+      
+      if (error instanceof Error) {
+        logDebug("Camera access error details", { 
+          message: error.message, 
+          name: error.name, 
+          stack: error.stack 
+        });
+        
+        if (error.name === "NotAllowedError" || error.message.includes("Permission denied")) {
+          errorMessage = "Camera access denied. Please allow access in your browser settings and try again.";
+        } else if (error.name === "NotFoundError" || error.message.includes("Requested device not found")) {
+          errorMessage = "No camera detected. Please connect a camera and try again.";
+        } else if (error.name === "NotReadableError" || error.message.includes("The device is in use")) {
+          errorMessage = "Camera is in use by another application. Please close other apps using your camera.";
+        } else if (error.name === "AbortError" || error.message.includes("Timeout")) {
+          errorMessage = "Camera access timed out. Try increasing the timeout or check your browser settings.";
+        } else if (error.name === "TypeError" || error.message.includes("constraint")) {
+          errorMessage = "Your camera doesn't support the required quality settings. Try a different device.";
+        } else if (error.name === "SecurityError" || error.message.includes("secure context")) {
+          errorMessage = "Camera access requires a secure connection (HTTPS).";
+        }
+      }
+      
+      setCameraAccessError(errorMessage);
+      
+      toast({
+        title: "Camera access failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const tryAccessCamera = async (attemptNumber = 1, deviceId?: string): Promise<MediaStream> => {
+    logDebug(`Camera access attempt #${attemptNumber}`, { deviceId });
+    
+    let constraints: MediaStreamConstraints;
+    
+    if (attemptNumber === 1 && deviceId) {
+      constraints = {
+        video: {
+          deviceId: { exact: deviceId },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 }
+        },
+        audio: true
+      };
+    } else if (attemptNumber === 1) {
+      constraints = {
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 }
+        },
+        audio: true
+      };
+    } else if (attemptNumber === 2) {
+      constraints = {
+        video: deviceId ? { deviceId: { exact: deviceId } } : true,
+        audio: true
+      };
+    } else {
+      constraints = {
+        video: true,
+        audio: true
+      };
+      setUsingFallbackMode(true);
+    }
+    
+    logDebug("Using constraints", constraints);
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      return stream;
+    } catch (error) {
+      logDebug(`Attempt #${attemptNumber} failed`, error);
+      
+      if (attemptNumber < 3) {
+        return tryAccessCamera(attemptNumber + 1, deviceId);
+      }
+      
+      throw error;
+    }
+  };
+  
+  const attemptScreenshareWithCamera = async () => {
+    try {
+      logDebug("Attempting screenshare with camera fallback");
+      setCameraAccessError(null);
+      setIsInitializingCamera(true);
+      
+      const displayStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true
+      });
+      
+      logDebug("Screen sharing initialized");
+      setUsingFallbackMode(true);
+      setIsInitializingCamera(false);
+      streamRef.current = displayStream;
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = displayStream;
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play().catch(err => {
+            logDebug("Error playing screenshare video", err);
+            setCameraAccessError("Error playing video stream. Please refresh and try again.");
+          });
+        };
+      }
+      
+      chunksRef.current = [];
+      
+      const mimeType = getSupportedMimeType();
+      
+      const options: MediaRecorderOptions = {
+        mimeType: mimeType,
+        audioBitsPerSecond: 128000,
+        videoBitsPerSecond: 2500000
+      };
+      
+      const mediaRecorder = new MediaRecorder(displayStream, options);
       mediaRecorderRef.current = mediaRecorder;
       
       mediaRecorder.ondataavailable = (e) => {
@@ -216,7 +424,12 @@ export default function Record() {
         }
       };
       
+      displayStream.getVideoTracks()[0].onended = () => {
+        stopRecording();
+      };
+      
       mediaRecorder.start(1000);
+      logDebug("Screen recorder started");
       setIsRecording(true);
       setIsPaused(false);
       
@@ -224,40 +437,24 @@ export default function Record() {
         setRecordingTime(prev => prev + 1);
       }, 1000);
       
+      toast({
+        title: "Screen sharing mode",
+        description: "Recording your screen instead of camera. Click Stop when finished.",
+      });
+      
     } catch (error) {
-      console.error("Error accessing media devices:", error);
+      logDebug("Screenshare fallback failed", error);
       setIsInitializingCamera(false);
-      
-      let errorMessage = "Failed to access camera and microphone.";
-      
-      if (error instanceof Error) {
-        console.error("Error message:", error.message);
-        console.error("Error name:", error.name);
-        
-        if (error.name === "NotAllowedError" || error.message.includes("Permission denied")) {
-          errorMessage = "Camera access denied. Please allow access in your browser settings.";
-        } else if (error.name === "NotFoundError" || error.message.includes("Requested device not found")) {
-          errorMessage = "No camera detected. Please connect a camera and try again.";
-        } else if (error.name === "NotReadableError" || error.message.includes("The device is in use")) {
-          errorMessage = "Camera is in use by another application. Please close other apps using your camera.";
-        } else if (error.name === "AbortError" || error.message.includes("Timeout")) {
-          errorMessage = "Camera access timed out. Your browser may have blocked access.";
-        } else if (error.name === "TypeError" || error.message.includes("constraint")) {
-          errorMessage = "Your camera doesn't support the required quality settings. Try a different device.";
-        }
-      }
-      
-      setCameraAccessError(errorMessage);
+      setCameraAccessError("Both camera access and screen sharing failed. Please check your browser settings.");
       
       toast({
-        title: "Camera access failed",
-        description: errorMessage,
+        title: "Recording failed",
+        description: "Unable to access camera or screen. Please check permissions.",
         variant: "destructive",
       });
     }
   };
   
-  // Helper function to determine supported mime type
   const getSupportedMimeType = () => {
     const types = [
       'video/webm;codecs=vp9,opus',
@@ -270,10 +467,12 @@ export default function Record() {
     
     for (const type of types) {
       if (MediaRecorder.isTypeSupported(type)) {
+        logDebug(`Mime type supported: ${type}`);
         return type;
       }
     }
     
+    logDebug(`No specific mime type supported, using fallback`);
     return 'video/webm'; // fallback
   };
   
@@ -482,6 +681,224 @@ export default function Record() {
     );
   };
 
+  const DebugDialog = () => {
+    const isMobile = window.innerWidth < 768;
+    
+    const DebugContent = () => (
+      <div className="space-y-4 max-h-[70vh] overflow-auto">
+        <div className="space-y-2">
+          <h3 className="font-semibold">Camera Information</h3>
+          {availableCameras.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-sm">Detected {availableCameras.length} camera(s):</p>
+              <ul className="list-disc pl-5 text-sm space-y-1">
+                {availableCameras.map((camera, i) => (
+                  <li key={i} className={selectedCameraId === camera.deviceId ? "font-semibold" : ""}>
+                    {camera.label || `Camera ${i+1}`} 
+                    {selectedCameraId === camera.deviceId && " (selected)"}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="text-sm text-yellow-600">No cameras detected</p>
+          )}
+        </div>
+        
+        <div className="space-y-2">
+          <h3 className="font-semibold">Browser Information</h3>
+          <div className="text-sm space-y-1">
+            <p>Browser: {getBrowserName()}</p>
+            <p>User Agent: {navigator.userAgent}</p>
+            <p>Is Mobile: {/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? 'Yes' : 'No'}</p>
+            <p>Secure Context: {window.isSecureContext ? 'Yes' : 'No'}</p>
+            <p>MediaDevices API: {navigator.mediaDevices ? 'Available' : 'Not Available'}</p>
+            <p>MediaRecorder API: {typeof MediaRecorder !== 'undefined' ? 'Available' : 'Not Available'}</p>
+          </div>
+        </div>
+        
+        <div className="space-y-2">
+          <h3 className="font-semibold">Debug Settings</h3>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="timeout">Camera access timeout (ms):</Label>
+              <Input 
+                id="timeout" 
+                type="number" 
+                value={cameraAccessTimeout} 
+                onChange={(e) => setCameraAccessTimeout(Number(e.target.value))}
+                className="w-24" 
+                min={1000} 
+                max={60000} 
+                step={1000}
+              />
+            </div>
+            
+            <Button onClick={() => enumerateDevices()} variant="outline" size="sm">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh device list
+            </Button>
+          </div>
+        </div>
+        
+        <div className="space-y-2">
+          <h3 className="font-semibold">Debug Log</h3>
+          <div className="bg-slate-100 dark:bg-slate-900 p-2 rounded-md h-40 overflow-y-auto text-xs font-mono">
+            {debugLogs.length > 0 ? (
+              debugLogs.map((log, i) => (
+                <div key={i} className="pb-1">{log}</div>
+              ))
+            ) : (
+              <p className="text-muted-foreground">No logs yet</p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+    
+    if (isMobile) {
+      return (
+        <Drawer open={showDebugDialog} onOpenChange={setShowDebugDialog}>
+          <DrawerContent>
+            <DrawerHeader>
+              <DrawerTitle>Camera Debug Information</DrawerTitle>
+              <DrawerDescription>
+                Technical details to help diagnose camera issues
+              </DrawerDescription>
+            </DrawerHeader>
+            <div className="px-4 pb-4">
+              <DebugContent />
+            </div>
+          </DrawerContent>
+        </Drawer>
+      );
+    }
+    
+    return (
+      <Dialog open={showDebugDialog} onOpenChange={setShowDebugDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Camera Debug Information</DialogTitle>
+            <DialogDescription>
+              Technical details to help diagnose camera issues
+            </DialogDescription>
+          </DialogHeader>
+          <DebugContent />
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
+  useEffect(() => {
+    checkBrowserCompatibility();
+    enumerateDevices();
+    
+    const fetchData = async () => {
+      try {
+        const performanceData = await performanceService.getPerformances();
+        setPerformances(performanceData);
+        
+        if (!rehearsalIdParam) {
+          const rehearsalData = await rehearsalService.getAllRehearsals();
+          setAvailableRehearsals(rehearsalData);
+        } else {
+          const rehearsal = await rehearsalService.getRehearsalById(rehearsalIdParam);
+          if (rehearsal) {
+            setSelectedRehearsal(rehearsal.id);
+            setSelectedPerformance(rehearsal.performanceId);
+            const filteredRehearsals = await rehearsalService.getRehearsalsByPerformance(rehearsal.performanceId);
+            setAvailableRehearsals(filteredRehearsals);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        logDebug("Error fetching data", error);
+        toast({
+          title: "Error",
+          description: "Failed to load performances and rehearsals. Please try again.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    fetchData();
+  }, [rehearsalIdParam, toast]);
+  
+  useEffect(() => {
+    const updateRehearsals = async () => {
+      if (selectedPerformance) {
+        try {
+          const rehearsals = await rehearsalService.getRehearsalsByPerformance(selectedPerformance);
+          setAvailableRehearsals(rehearsals);
+          
+          if (rehearsals.length > 0 && !selectedRehearsal) {
+            setSelectedRehearsal(rehearsals[0].id);
+          }
+        } catch (error) {
+          console.error("Error fetching rehearsals for performance:", error);
+          logDebug("Error fetching rehearsals for performance", error);
+          toast({
+            title: "Error",
+            description: "Failed to load rehearsals for this performance.",
+            variant: "destructive",
+          });
+        }
+      }
+    };
+
+    updateRehearsals();
+  }, [selectedPerformance, selectedRehearsal, toast]);
+  
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (timerRef.current) {
+        window.clearInterval(timerRef.current);
+      }
+      if (videoUrl) {
+        URL.revokeObjectURL(videoUrl);
+      }
+    };
+  }, [videoUrl]);
+  
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+  
+  const UploadPhaseIndicator = ({ 
+    currentPhase, 
+    phaseName,
+    phaseLabel,
+    icon
+  }: { 
+    currentPhase: string; 
+    phaseName: 'preparing' | 'uploading' | 'processing' | 'saving' | 'complete' | 'error';
+    phaseLabel: string;
+    icon: React.ReactNode;
+  }) => {
+    const isActive = currentPhase === phaseName;
+    const isComplete = (
+      (phaseName === 'preparing' && ['uploading', 'processing', 'saving', 'complete'].includes(currentPhase)) ||
+      (phaseName === 'uploading' && ['processing', 'saving', 'complete'].includes(currentPhase)) ||
+      (phaseName === 'processing' && ['saving', 'complete'].includes(currentPhase)) ||
+      (phaseName === 'saving' && ['complete'].includes(currentPhase)) ||
+      (phaseName === 'complete' && currentPhase === 'complete')
+    );
+    
+    return (
+      <div className="upload-phase">
+        <div className={`upload-phase-indicator ${isActive ? 'active' : ''} ${isComplete ? 'complete' : ''}`}>
+          {isComplete ? <Check className="h-3 w-3" /> : icon}
+        </div>
+        <span>{phaseLabel}</span>
+      </div>
+    );
+  };
+
   return (
     <div className="container max-w-6xl py-6 space-y-6">
       <div className="flex flex-col sm:flex-row justify-between gap-4">
@@ -494,37 +911,57 @@ export default function Record() {
             <span>Record Video</span>
           </h1>
         </div>
-        {recordedBlob && (
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={resetRecording} disabled={isUploading}>
-              <X className="mr-2 h-4 w-4" />
-              Reset
-            </Button>
-            <Button 
-              onClick={saveRecording} 
-              disabled={isLoading || isUploading}
-              className={uploadComplete ? "bg-green-600 hover:bg-green-700" : ""}
-            >
-              {uploadComplete ? (
-                <>
-                  <Check className="mr-2 h-4 w-4" />
-                  Saved
-                </>
-              ) : isUploading ? (
-                <>
-                  <Upload className="mr-2 h-4 w-4 animate-pulse" />
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Recording
-                </>
-              )}
-            </Button>
-          </div>
-        )}
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="icon"
+            onClick={() => {
+              setDebugMode(!debugMode);
+              setShowDebugDialog(!debugMode);
+            }}
+            className="relative"
+            title="Debug mode"
+          >
+            <Bug className="h-4 w-4" />
+            {debugMode && (
+              <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-green-500"></span>
+            )}
+          </Button>
+          
+          {recordedBlob && (
+            <>
+              <Button variant="outline" onClick={resetRecording} disabled={isUploading}>
+                <X className="mr-2 h-4 w-4" />
+                Reset
+              </Button>
+              <Button 
+                onClick={saveRecording} 
+                disabled={isLoading || isUploading}
+                className={uploadComplete ? "bg-green-600 hover:bg-green-700" : ""}
+              >
+                {uploadComplete ? (
+                  <>
+                    <Check className="mr-2 h-4 w-4" />
+                    Saved
+                  </>
+                ) : isUploading ? (
+                  <>
+                    <Upload className="mr-2 h-4 w-4 animate-pulse" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Recording
+                  </>
+                )}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
+      
+      {debugMode && <DebugDialog />}
       
       {isUploading && (
         <div className="bg-background border rounded-md p-4 space-y-3">
@@ -619,6 +1056,26 @@ export default function Record() {
                 <p className="text-sm text-muted-foreground">
                   Press the record button below to start
                 </p>
+                
+                {availableCameras.length > 0 && (
+                  <div className="mt-4">
+                    <Select
+                      value={selectedCameraId}
+                      onValueChange={setSelectedCameraId}
+                    >
+                      <SelectTrigger className="w-[250px]">
+                        <SelectValue placeholder="Select a camera" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableCameras.map((camera) => (
+                          <SelectItem key={camera.deviceId} value={camera.deviceId}>
+                            {camera.label || `Camera ${camera.deviceId.substring(0, 5)}...`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
             )}
             
@@ -632,6 +1089,12 @@ export default function Record() {
                   <p className="text-sm text-muted-foreground mt-1">
                     Please allow camera access when prompted
                   </p>
+                  {debugMode && (
+                    <p className="text-xs text-muted-foreground mt-3">
+                      Timeout: {cameraAccessTimeout/1000}s | 
+                      Selected camera: {selectedCameraId ? selectedCameraId.substring(0, 8) + '...' : 'default'}
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -644,11 +1107,25 @@ export default function Record() {
                     <div>
                       <h3 className="font-semibold text-red-900">Camera Access Error</h3>
                       <p className="text-red-700 mt-1 text-sm">{cameraAccessError}</p>
-                      <div className="mt-3 flex flex-col gap-2">
+                      <div className="mt-3 flex flex-wrap gap-2">
                         <Button variant="outline" size="sm" onClick={() => setCameraAccessError(null)}>
                           Try Again
                         </Button>
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <Button variant="outline" size="sm" onClick={() => {
+                          setCameraAccessTimeout(cameraAccessTimeout + 5000);
+                          setCameraAccessError(null);
+                        }}>
+                          Increase Timeout (+5s)
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={attemptScreenshareWithCamera}>
+                          Try Screen Share
+                        </Button>
+                        {debugMode && (
+                          <Button variant="outline" size="sm" onClick={() => setShowDebugDialog(true)}>
+                            <Bug className="h-3 w-3 mr-1" /> Debug Info
+                          </Button>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-1 w-full">
                           Make sure your camera is connected and you've allowed browser permissions
                         </p>
                       </div>
@@ -670,6 +1147,7 @@ export default function Record() {
               <div className="absolute top-4 left-4 bg-black/50 text-white px-3 py-1 rounded-full flex items-center gap-2">
                 <div className={`h-2 w-2 rounded-full ${isPaused ? 'bg-yellow-500' : 'bg-red-500 animate-pulse'}`} />
                 <span>{formatTime(recordingTime)}</span>
+                {usingFallbackMode && <Badge variant="outline" className="ml-1 text-xs">Fallback Mode</Badge>}
               </div>
             )}
           </div>
@@ -717,6 +1195,9 @@ export default function Record() {
               <Clock className="h-4 w-4 text-muted-foreground" />
               <span>Recording length: {formatTime(recordingTime)}</span>
               <Badge variant="outline" className="ml-auto">{Math.round(recordedBlob.size / 1024 / 1024 * 10) / 10} MB</Badge>
+              {usingFallbackMode && (
+                <Badge variant="secondary">Fallback mode used</Badge>
+              )}
             </div>
           )}
         </div>
