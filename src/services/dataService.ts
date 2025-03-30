@@ -10,6 +10,7 @@ export interface CreatePerformanceData {
   startDate?: string;
   endDate?: string;
   taggedUsers?: string[];
+  createdBy: string; // Added this required field
 }
 
 export interface UpdatePerformanceData extends Partial<CreatePerformanceData> {
@@ -108,7 +109,8 @@ class DataService {
         cover_image: performanceData.coverImage,
         start_date: performanceData.startDate,
         end_date: performanceData.endDate,
-        tagged_users: performanceData.taggedUsers
+        tagged_users: performanceData.taggedUsers,
+        created_by: performanceData.createdBy // Add the created_by field here
       })
       .select()
       .single();
