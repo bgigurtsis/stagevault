@@ -869,36 +869,6 @@ export default function Record() {
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
   
-  const UploadPhaseIndicator = ({ 
-    currentPhase, 
-    phaseName,
-    phaseLabel,
-    icon
-  }: { 
-    currentPhase: string; 
-    phaseName: 'preparing' | 'uploading' | 'processing' | 'saving' | 'complete' | 'error';
-    phaseLabel: string;
-    icon: React.ReactNode;
-  }) => {
-    const isActive = currentPhase === phaseName;
-    const isComplete = (
-      (phaseName === 'preparing' && ['uploading', 'processing', 'saving', 'complete'].includes(currentPhase)) ||
-      (phaseName === 'uploading' && ['processing', 'saving', 'complete'].includes(currentPhase)) ||
-      (phaseName === 'processing' && ['saving', 'complete'].includes(currentPhase)) ||
-      (phaseName === 'saving' && ['complete'].includes(currentPhase)) ||
-      (phaseName === 'complete' && currentPhase === 'complete')
-    );
-    
-    return (
-      <div className="upload-phase">
-        <div className={`upload-phase-indicator ${isActive ? 'active' : ''} ${isComplete ? 'complete' : ''}`}>
-          {isComplete ? <Check className="h-3 w-3" /> : icon}
-        </div>
-        <span>{phaseLabel}</span>
-      </div>
-    );
-  };
-
   return (
     <div className="container max-w-6xl py-6 space-y-6">
       <div className="flex flex-col sm:flex-row justify-between gap-4">
