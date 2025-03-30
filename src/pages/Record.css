@@ -48,3 +48,31 @@
   background-color: #3b82f6;
   transition: width 0.3s ease;
 }
+
+.upload-phase {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.upload-phase-indicator {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background-color: #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.upload-phase-indicator.active {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.upload-phase-indicator.complete {
+  background-color: #10b981;
+  color: white;
+}

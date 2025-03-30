@@ -20,8 +20,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { format, parseISO } from "date-fns";
-import { ArrowLeft, Calendar, MapPin, Pencil, Trash, Video, Users, Clock, Tag, Plus } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, Pencil, Trash, Video, Users, Clock, Tag, Plus, Play, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
@@ -32,6 +40,9 @@ export default function RehearsalDetail() {
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [recordingToDelete, setRecordingToDelete] = useState<string | null>(null);
+  const [videoDialogOpen, setVideoDialogOpen] = useState(false);
+  const [selectedRecording, setSelectedRecording] = useState<Recording | null>(null);
+  
   const { rehearsalId } = useParams<{ rehearsalId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -120,6 +131,11 @@ export default function RehearsalDetail() {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+  
+  const openVideoDialog = (recording: Recording) => {
+    setSelectedRecording(recording);
+    setVideoDialogOpen(true);
   };
 
   if (loading) {
@@ -262,15 +278,24 @@ export default function RehearsalDetail() {
                 </CardHeader>
                 <CardContent className="flex-grow">
                   {recording.thumbnailUrl ? (
-                    <div className="aspect-video mb-3 overflow-hidden rounded-md bg-muted">
+                    <div 
+                      className="aspect-video mb-3 overflow-hidden rounded-md bg-muted group relative cursor-pointer"
+                      onClick={() => openVideoDialog(recording)}
+                    >
                       <img 
                         src={recording.thumbnailUrl} 
                         alt={recording.title} 
                         className="h-full w-full object-cover" 
                       />
+                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Play className="h-12 w-12 text-white" />
+                      </div>
                     </div>
                   ) : (
-                    <div className="aspect-video mb-3 overflow-hidden rounded-md bg-muted flex items-center justify-center">
+                    <div 
+                      className="aspect-video mb-3 overflow-hidden rounded-md bg-muted flex items-center justify-center cursor-pointer"
+                      onClick={() => recording.videoUrl ? openVideoDialog(recording) : null}
+                    >
                       <Video className="h-8 w-8 text-muted-foreground/50" />
                     </div>
                   )}
@@ -292,15 +317,19 @@ export default function RehearsalDetail() {
                   )}
                 </CardContent>
                 <CardFooter className="flex gap-2 pt-2 border-t">
-                  {recording.videoUrl ? (
-                    <Button variant="outline" className="flex-1" asChild>
+                  <Button 
+                    variant="outline" 
+                    className="flex-1" 
+                    onClick={() => openVideoDialog(recording)}
+                    disabled={!recording.videoUrl}
+                  >
+                    <Play className="mr-2 h-4 w-4" /> Play
+                  </Button>
+                  {recording.videoUrl && (
+                    <Button variant="outline" size="icon" asChild>
                       <a href={recording.videoUrl} target="_blank" rel="noopener noreferrer">
-                        View Recording
+                        <ExternalLink className="h-4 w-4" />
                       </a>
-                    </Button>
-                  ) : (
-                    <Button variant="outline" className="flex-1" disabled>
-                      No Video Available
                     </Button>
                   )}
                   <Button 
@@ -337,6 +366,59 @@ export default function RehearsalDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      {/* Video Dialog */}
+      <Dialog open={videoDialogOpen} onOpenChange={setVideoDialogOpen}>
+        <DialogContent className="sm:max-w-[900px] p-0 overflow-hidden">
+          <DialogHeader className="p-4 border-b">
+            <DialogTitle>{selectedRecording?.title}</DialogTitle>
+            <DialogDescription className="flex items-center gap-1">
+              <Clock className="h-3 w-3" /> {formatDuration(selectedRecording?.duration)}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="aspect-video bg-black">
+            {selectedRecording?.videoUrl && (
+              <iframe 
+                src={selectedRecording.videoUrl.replace('/view', '/preview')} 
+                className="w-full h-full" 
+                allow="autoplay; fullscreen"
+                title={selectedRecording.title}
+              />
+            )}
+          </div>
+          <div className="p-4">
+            {selectedRecording?.notes && (
+              <div className="mb-4">
+                <h4 className="text-sm font-medium mb-1">Notes:</h4>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedRecording.notes}</p>
+              </div>
+            )}
+            
+            {selectedRecording?.tags && selectedRecording.tags.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium mb-1">Tags:</h4>
+                <div className="flex flex-wrap gap-1">
+                  {selectedRecording.tags.map((tag, index) => (
+                    <Badge key={index} variant="outline" className="text-xs">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {selectedRecording?.videoUrl && (
+              <div className="mt-4 flex justify-end">
+                <Button asChild>
+                  <a href={selectedRecording.videoUrl} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="mr-2 h-4 w-4" /> Open in Google Drive
+                  </a>
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

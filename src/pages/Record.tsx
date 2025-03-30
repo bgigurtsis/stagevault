@@ -10,13 +10,15 @@ import {
   ArrowLeft,
   Upload,
   Check,
-  Clock
+  Clock,
+  AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import { 
   Select, 
   SelectContent, 
@@ -24,8 +26,6 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { performanceService } from "@/services/performanceService";
 import { rehearsalService } from "@/services/rehearsalService";
@@ -51,6 +51,9 @@ export default function Record() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadComplete, setUploadComplete] = useState(false);
+  const [uploadPhase, setUploadPhase] = useState<'preparing' | 'uploading' | 'processing' | 'saving' | 'complete' | 'error'>('preparing');
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -71,7 +74,7 @@ export default function Record() {
         
         if (!rehearsalIdParam) {
           const rehearsalData = await rehearsalService.getAllRehearsals();
-          setAvailableRehearsals(rehearsalData);
+          setAvailableRehearsals(rehearsersalData);
         } else {
           const rehearsal = await rehearsalService.getRehearsalById(rehearsalIdParam);
           if (rehearsal) {
@@ -141,7 +144,11 @@ export default function Record() {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: true, 
+        video: { 
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 }
+        }, 
         audio: true 
       });
       
@@ -153,7 +160,17 @@ export default function Record() {
       
       chunksRef.current = [];
       
-      const mediaRecorder = new MediaRecorder(stream);
+      const options: MediaRecorderOptions = {
+        mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9') 
+          ? 'video/webm;codecs=vp9'
+          : MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
+            ? 'video/webm;codecs=vp8'
+            : 'video/webm',
+        audioBitsPerSecond: 128000,
+        videoBitsPerSecond: 2500000
+      };
+      
+      const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
       
       mediaRecorder.ondataavailable = (e) => {
@@ -175,7 +192,7 @@ export default function Record() {
         }
       };
       
-      mediaRecorder.start();
+      mediaRecorder.start(1000);
       setIsRecording(true);
       setIsPaused(false);
       
@@ -246,6 +263,22 @@ export default function Record() {
     }
   };
   
+  const handleRetry = () => {
+    if (retryCount < 3) {
+      setRetryCount(prev => prev + 1);
+      setUploadProgress(0);
+      setUploadPhase('preparing');
+      setUploadError(null);
+      saveRecording();
+    } else {
+      toast({
+        title: "Upload failed",
+        description: "Maximum retry attempts reached. Please try again later.",
+        variant: "destructive",
+      });
+    }
+  };
+  
   const saveRecording = async () => {
     if (!title) {
       toast({
@@ -276,6 +309,8 @@ export default function Record() {
     
     setIsLoading(true);
     setIsUploading(true);
+    setUploadPhase('preparing');
+    setUploadError(null);
     
     try {
       const rehearsal = availableRehearsals.find(r => r.id === selectedRehearsal);
@@ -287,6 +322,8 @@ export default function Record() {
       const fileExtension = "webm";
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
       const fileName = `${title.replace(/[^a-z0-9]/gi, "_")}_${timestamp}.${fileExtension}`;
+      
+      setUploadPhase('uploading');
       
       const driveFile = await googleDriveService.uploadVideo(
         recordedBlob,
@@ -302,7 +339,11 @@ export default function Record() {
         throw new Error("Failed to upload video to Google Drive");
       }
       
-      setUploadComplete(true);
+      setUploadPhase('processing');
+      
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      setUploadPhase('saving');
       
       const tagsArray = tags.split(',').map(tag => tag.trim()).filter(tag => tag !== '');
       
@@ -317,24 +358,60 @@ export default function Record() {
         googleFileId: driveFile.id
       });
       
+      setUploadPhase('complete');
+      setUploadComplete(true);
+      
       toast({
         title: "Recording saved",
         description: "Your recording has been successfully uploaded to Google Drive and saved.",
       });
       
       navigate(`/rehearsals/${selectedRehearsal}`);
+      
     } catch (error) {
       console.error("Error saving recording:", error);
+      setUploadPhase('error');
       setIsUploading(false);
+      setUploadError(error instanceof Error ? error.message : "An unknown error occurred");
       
       toast({
-        title: "Error",
+        title: "Upload error",
         description: error instanceof Error ? error.message : "Failed to save recording. Please try again.",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const UploadPhaseIndicator = ({ 
+    currentPhase, 
+    phaseName,
+    phaseLabel,
+    icon
+  }: { 
+    currentPhase: string; 
+    phaseName: 'preparing' | 'uploading' | 'processing' | 'saving' | 'complete' | 'error';
+    phaseLabel: string;
+    icon: React.ReactNode;
+  }) => {
+    const isActive = currentPhase === phaseName;
+    const isComplete = (
+      (phaseName === 'preparing' && ['uploading', 'processing', 'saving', 'complete'].includes(currentPhase)) ||
+      (phaseName === 'uploading' && ['processing', 'saving', 'complete'].includes(currentPhase)) ||
+      (phaseName === 'processing' && ['saving', 'complete'].includes(currentPhase)) ||
+      (phaseName === 'saving' && ['complete'].includes(currentPhase)) ||
+      (phaseName === 'complete' && currentPhase === 'complete')
+    );
+    
+    return (
+      <div className="upload-phase">
+        <div className={`upload-phase-indicator ${isActive ? 'active' : ''} ${isComplete ? 'complete' : ''}`}>
+          {isComplete ? <Check className="h-3 w-3" /> : icon}
+        </div>
+        <span>{phaseLabel}</span>
+      </div>
+    );
   };
 
   return (
@@ -382,15 +459,81 @@ export default function Record() {
       </div>
       
       {isUploading && (
-        <div className="bg-background border rounded-md p-4 space-y-2">
+        <div className="bg-background border rounded-md p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Uploading to Google Drive</span>
-            <span className="text-sm text-muted-foreground">{Math.round(uploadProgress)}%</span>
+            <span className="text-sm font-medium">
+              {uploadPhase === 'preparing' && 'Preparing upload...'}
+              {uploadPhase === 'uploading' && 'Uploading to Google Drive...'}
+              {uploadPhase === 'processing' && 'Processing video...'}
+              {uploadPhase === 'saving' && 'Saving recording details...'}
+              {uploadPhase === 'complete' && 'Upload complete!'}
+              {uploadPhase === 'error' && 'Upload failed'}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              {uploadPhase === 'uploading' ? `${Math.round(uploadProgress)}%` : ''}
+            </span>
           </div>
-          <Progress value={uploadProgress} className="h-2" />
+          
+          <Progress 
+            value={uploadPhase === 'uploading' ? uploadProgress : 
+                  uploadPhase === 'preparing' ? 10 : 
+                  uploadPhase === 'processing' ? 80 : 
+                  uploadPhase === 'saving' ? 95 : 
+                  uploadPhase === 'complete' ? 100 : 0} 
+            className="h-2" 
+          />
+          
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <UploadPhaseIndicator 
+              currentPhase={uploadPhase} 
+              phaseName="preparing" 
+              phaseLabel="Prepare" 
+              icon={<Clock className="h-3 w-3" />} 
+            />
+            <UploadPhaseIndicator 
+              currentPhase={uploadPhase} 
+              phaseName="uploading" 
+              phaseLabel="Upload" 
+              icon={<Upload className="h-3 w-3" />} 
+            />
+            <UploadPhaseIndicator 
+              currentPhase={uploadPhase} 
+              phaseName="processing" 
+              phaseLabel="Process" 
+              icon={<Video className="h-3 w-3" />} 
+            />
+            <UploadPhaseIndicator 
+              currentPhase={uploadPhase} 
+              phaseName="saving" 
+              phaseLabel="Save" 
+              icon={<Save className="h-3 w-3" />} 
+            />
+          </div>
+          
+          {uploadError && (
+            <div className="bg-red-50 border border-red-200 rounded p-3 flex items-start gap-2 text-sm">
+              <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium text-red-800">Upload failed</p>
+                <p className="text-red-700">{uploadError}</p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-2" 
+                  onClick={handleRetry}
+                  disabled={retryCount >= 3}
+                >
+                  Retry Upload ({retryCount}/3)
+                </Button>
+              </div>
+            </div>
+          )}
+          
           <p className="text-xs text-muted-foreground">
-            {uploadComplete ? 
-              "Upload complete! Saving recording details..." : 
+            {uploadPhase === 'complete' ? 
+              "Upload complete! Redirecting to rehearsal page..." : 
+              uploadPhase === 'error' ?
+              "There was an error uploading your video. Please try again." :
               "Please do not close this page while the video is uploading."}
           </p>
         </div>
@@ -467,6 +610,7 @@ export default function Record() {
             <div className="bg-muted/40 border rounded p-3 text-sm flex items-center gap-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
               <span>Recording length: {formatTime(recordingTime)}</span>
+              <Badge variant="outline" className="ml-auto">{Math.round(recordedBlob.size / 1024 / 1024 * 10) / 10} MB</Badge>
             </div>
           )}
         </div>
