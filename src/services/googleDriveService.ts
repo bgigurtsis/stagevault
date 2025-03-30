@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 const ROOT_FOLDER_NAME = "StageVault Recordings";
@@ -43,6 +44,15 @@ class GoogleDriveService {
         console.log("User metadata:", session.user.user_metadata);
         console.log("App metadata:", session.user.app_metadata);
         
+        // Detailed logging for debugging
+        console.log("Full session object (without sensitive data):", {
+          ...session,
+          access_token: session.access_token ? "[REDACTED]" : null,
+          refresh_token: session.refresh_token ? "[REDACTED]" : null,
+          provider_token: session.provider_token ? "[REDACTED]" : null,
+          provider_refresh_token: session.provider_refresh_token ? "[REDACTED]" : null,
+        });
+        
         // If we have refresh token, we might be able to get a new token
         if (session.refresh_token) {
           console.log("We have refresh token, trying to refresh session");
@@ -59,6 +69,16 @@ class GoogleDriveService {
             return refreshData.session.provider_token;
           } else {
             console.error("Still no provider token after refresh");
+            console.log("Refresh data:", {
+              ...refreshData,
+              session: refreshData.session ? {
+                ...refreshData.session,
+                access_token: "[REDACTED]",
+                refresh_token: "[REDACTED]",
+                provider_token: refreshData.session.provider_token ? "[REDACTED]" : null,
+                provider_refresh_token: refreshData.session.provider_refresh_token ? "[REDACTED]" : null,
+              } : null
+            });
             return null;
           }
         }
@@ -102,61 +122,80 @@ class GoogleDriveService {
       
       console.log("Search query:", query);
       
-      const searchResponse = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}`,
-        {
+      try {
+        const searchResponse = await fetch(
+          `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}`,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }
+        );
+        
+        if (!searchResponse.ok) {
+          console.error("Error searching for folder:", searchResponse.status, searchResponse.statusText);
+          const errorText = await searchResponse.text();
+          console.error("Error response:", errorText);
+          throw new Error(`Google Drive API error: ${searchResponse.status} ${searchResponse.statusText}`);
+        }
+        
+        const searchData = await searchResponse.json();
+        console.log("Search results:", searchData);
+        
+        // If folder exists, return its ID
+        if (searchData.files && searchData.files.length > 0) {
+          console.log(`Folder "${folderName}" found, ID:`, searchData.files[0].id);
+          return searchData.files[0].id;
+        }
+        
+        // Folder doesn't exist, create it
+        console.log(`Folder "${folderName}" not found, creating it`);
+        
+        const metaData = {
+          name: folderName,
+          mimeType: 'application/vnd.google-apps.folder',
+          parents: parentFolderId ? [parentFolderId] : ['root'],
+        };
+        
+        console.log("Create folder metadata:", metaData);
+        
+        const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
+          method: 'POST',
           headers: {
             Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
           },
+          body: JSON.stringify(metaData),
+        });
+        
+        if (!createResponse.ok) {
+          console.error("Error creating folder:", createResponse.status, createResponse.statusText);
+          const errorText = await createResponse.text();
+          console.error("Error response:", errorText);
+          throw new Error(`Google Drive API error: ${createResponse.status} ${createResponse.statusText}`);
         }
-      );
-      
-      if (!searchResponse.ok) {
-        console.error("Error searching for folder:", searchResponse.status, searchResponse.statusText);
-        const errorText = await searchResponse.text();
-        console.error("Error response:", errorText);
-        throw new Error(`Google Drive API error: ${searchResponse.status} ${searchResponse.statusText}`);
+        
+        const folder = await createResponse.json();
+        console.log(`Folder "${folderName}" created, ID:`, folder.id);
+        return folder.id;
+      } catch (apiError) {
+        console.error("Google Drive API error:", apiError);
+        console.log("Access token expired or insufficient permissions. Token prefix:", accessToken.substring(0, 10) + "...");
+        
+        // Check if this is an authentication error (401)
+        if (apiError.message && apiError.message.includes("401")) {
+          console.log("Attempting to refresh the token...");
+          const { data, error } = await supabase.auth.refreshSession();
+          
+          if (error) {
+            console.error("Failed to refresh session:", error);
+          } else if (data && data.session && data.session.provider_token) {
+            console.log("Successfully refreshed token. Retry the operation.");
+          }
+        }
+        
+        throw apiError;
       }
-      
-      const searchData = await searchResponse.json();
-      console.log("Search results:", searchData);
-      
-      // If folder exists, return its ID
-      if (searchData.files && searchData.files.length > 0) {
-        console.log(`Folder "${folderName}" found, ID:`, searchData.files[0].id);
-        return searchData.files[0].id;
-      }
-      
-      // Folder doesn't exist, create it
-      console.log(`Folder "${folderName}" not found, creating it`);
-      
-      const metaData = {
-        name: folderName,
-        mimeType: 'application/vnd.google-apps.folder',
-        parents: parentFolderId ? [parentFolderId] : ['root'],
-      };
-      
-      console.log("Create folder metadata:", metaData);
-      
-      const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(metaData),
-      });
-      
-      if (!createResponse.ok) {
-        console.error("Error creating folder:", createResponse.status, createResponse.statusText);
-        const errorText = await createResponse.text();
-        console.error("Error response:", errorText);
-        throw new Error(`Google Drive API error: ${createResponse.status} ${createResponse.statusText}`);
-      }
-      
-      const folder = await createResponse.json();
-      console.log(`Folder "${folderName}" created, ID:`, folder.id);
-      return folder.id;
     } catch (error) {
       console.error("=== Error finding or creating folder ===");
       console.error("Error type:", error.constructor.name);
@@ -171,22 +210,36 @@ class GoogleDriveService {
    */
   public async ensureFolderStructure(performanceName: string, rehearsalName: string): Promise<string | null> {
     try {
+      console.log(`=== Creating folder structure for Performance: "${performanceName}", Rehearsal: "${rehearsalName}" ===`);
+      
       // Find or create the root StageVault folder
       const rootFolderId = await this.findOrCreateFolder(ROOT_FOLDER_NAME);
-      if (!rootFolderId) return null;
+      if (!rootFolderId) {
+        console.error("Failed to create or find root folder");
+        return null;
+      }
       
       // Find or create the performance folder
       const performanceFolderId = await this.findOrCreateFolder(
         `Performance ${performanceName}`, 
         rootFolderId
       );
-      if (!performanceFolderId) return null;
+      if (!performanceFolderId) {
+        console.error("Failed to create or find performance folder");
+        return null;
+      }
       
       // Find or create the rehearsal folder
       const rehearsalFolderId = await this.findOrCreateFolder(
         `Rehearsal ${rehearsalName}`, 
         performanceFolderId
       );
+      
+      if (!rehearsalFolderId) {
+        console.error("Failed to create or find rehearsal folder");
+      } else {
+        console.log("Successfully created folder structure with rehearsal folder ID:", rehearsalFolderId);
+      }
       
       return rehearsalFolderId;
     } catch (error) {

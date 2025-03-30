@@ -34,14 +34,20 @@ export default function PerformanceNew() {
         createdBy: currentUser.id,
       };
 
+      console.log("Creating performance with formatted values:", formattedValues);
       const performance = await performanceService.createPerformance(formattedValues);
       
       if (performance) {
+        console.log("Performance created successfully, navigating to:", `/performances/${performance.id}`);
         toast({
           title: "Performance created",
           description: "Your performance has been created successfully",
         });
-        navigate(`/performances/${performance.id}`);
+        
+        // Use timeout to ensure state updates have completed
+        setTimeout(() => {
+          navigate(`/performances/${performance.id}`);
+        }, 100);
       } else {
         throw new Error("Failed to create performance");
       }

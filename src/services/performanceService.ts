@@ -1,4 +1,3 @@
-
 import { BaseService } from "./baseService";
 import { Performance } from "@/types";
 
@@ -43,6 +42,8 @@ export class PerformanceService extends BaseService {
   }
   
   async getPerformanceById(id: string): Promise<Performance | null> {
+    console.log(`Fetching performance with ID: ${id}`);
+    
     const { data, error } = await this.supabase
       .from("performances")
       .select("*")
@@ -53,6 +54,13 @@ export class PerformanceService extends BaseService {
       console.error("Error fetching performance:", error);
       return null;
     }
+    
+    if (!data) {
+      console.error("No performance found with ID:", id);
+      return null;
+    }
+    
+    console.log("Performance data retrieved:", data);
     
     return {
       id: data.id,
@@ -69,6 +77,8 @@ export class PerformanceService extends BaseService {
   }
   
   async createPerformance(performanceData: CreatePerformanceData): Promise<Performance | null> {
+    console.log("Creating performance with data:", performanceData);
+    
     const { data, error } = await this.supabase
       .from("performances")
       .insert({
@@ -87,6 +97,8 @@ export class PerformanceService extends BaseService {
       console.error("Error creating performance:", error);
       return null;
     }
+    
+    console.log("Performance created successfully:", data);
     
     return {
       id: data.id,
