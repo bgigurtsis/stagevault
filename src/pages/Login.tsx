@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -9,17 +9,38 @@ import { Video } from "lucide-react";
 
 export default function Login() {
   const [loading, setLoading] = useState(false);
-  const { loginWithGoogle } = useAuth();
+  const { loginWithGoogle, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Check for existing session and redirect if authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate("/");
+      toast({
+        title: "Welcome back!",
+        description: "You have successfully logged in.",
+      });
+    }
+  }, [isAuthenticated, navigate, toast]);
+
+  // Handle authentication hash params in URL
+  useEffect(() => {
+    // Check for hash parameters (access_token, etc.) which indicates a successful OAuth redirect
+    const hash = window.location.hash;
+    if (hash && hash.includes("access_token")) {
+      console.log("Auth redirect detected, clearing hash");
+      // Clear the hash from the URL to avoid issues on refresh
+      window.history.replaceState(null, document.title, window.location.pathname);
+    }
+  }, []);
 
   const handleGoogleLogin = async () => {
     setLoading(true);
     
     try {
       await loginWithGoogle();
-      // Note: No need to navigate here as the OAuth redirect will handle this
-      // The toast will be shown after successful redirect and auth state change
+      // No need to navigate here as the OAuth redirect will handle this
     } catch (error) {
       toast({
         title: "Login failed",

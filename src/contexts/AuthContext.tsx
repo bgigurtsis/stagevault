@@ -21,7 +21,6 @@ interface AuthContextType {
   logout: () => void;
 }
 
-// Fake users data
 const mockUsers: User[] = [
   {
     id: "1",
@@ -46,7 +45,6 @@ const mockUsers: User[] = [
   }
 ];
 
-// Creating the context with a default value
 const AuthContext = createContext<AuthContextType>({
   currentUser: null,
   users: [],
@@ -55,7 +53,7 @@ const AuthContext = createContext<AuthContextType>({
   login: async () => {},
   loginWithGoogle: async () => {},
   signup: async () => {},
-  logout: () => {}
+  logout: async () => {}
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -69,11 +67,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Initialize auth state
   useEffect(() => {
-    // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        console.log("Auth state changed:", event, session);
         setSession(session);
         
         if (session?.user) {
@@ -87,8 +84,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       }
     );
 
-    // Then check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log("Initial session check:", session);
       setSession(session);
       
       if (session?.user) {
@@ -102,7 +99,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Helper function to extract user info from Supabase user
   const extractUserInfo = (user: SupabaseUser): User => {
     return {
       id: user.id,
@@ -114,19 +110,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   const login = async (email: string, password: string) => {
-    // In a real app, you would make an API request to validate credentials
-    // and retrieve a token or session identifier
-    
     setIsLoading(true);
-    // Simulating API delay
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // Find user with matching email
     const user = mockUsers.find(u => u.email === email);
     
     if (user) {
       setCurrentUser(user);
-      // In a real app, you would store the token/session in localStorage or cookies
     } else {
       throw new Error("Invalid credentials");
     }
@@ -136,50 +126,48 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const loginWithGoogle = async () => {
     try {
+      const redirectTo = `${window.location.origin}/login`;
+      console.log("Redirecting to:", redirectTo);
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/`,
+          redirectTo: redirectTo,
+          queryParams: {
+            prompt: 'select_account',
+          }
         }
       });
       
       if (error) throw error;
     } catch (error) {
+      console.error("Google login error:", error);
       throw error;
     }
   };
 
   const signup = async (name: string, email: string, password: string, role?: "performer" | "choreographer") => {
-    // In a real app, you would make an API request to create a new user
-    
     setIsLoading(true);
-    // Simulating API delay
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // Check if email already exists
     if (mockUsers.some(u => u.email === email)) {
       throw new Error("Email already in use");
     }
     
-    // Create new user
     const newUser: User = {
-      id: String(mockUsers.length + 1), // Simple ID generation for mock data
+      id: String(mockUsers.length + 1),
       name,
       email,
-      // Default profile picture
       profilePicture: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`,
-      role: role || "performer" // Default to performer if no role is provided
+      role: role || "performer"
     };
     
-    // In a real app, you would add the user to the database
-    // For our mock, we'll simulate success and log the user in
     setCurrentUser(newUser);
     
     setIsLoading(false);
   };
 
-  const logout = () => {
-    // In a real app, you would clear the token/session
+  const logout = async () => {
     supabase.auth.signOut();
     setCurrentUser(null);
   };
