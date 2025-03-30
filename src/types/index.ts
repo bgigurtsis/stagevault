@@ -1,5 +1,4 @@
-
-import { User } from "../contexts/AuthContext";
+import { User } from "../contexts/types";
 
 export interface Performance {
   id: string;
