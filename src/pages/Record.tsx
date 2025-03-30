@@ -592,6 +592,12 @@ export default function Record() {
       
       setUploadPhase('uploading');
       
+      logDebug("Uploading video to Google Drive", {
+        rehearsalTitle: rehearsal.title,
+        performanceTitle: performance.title,
+        driveFolderId: rehearsal.drive_folder_id || "Not set"
+      });
+      
       const driveFile = await googleDriveService.uploadVideo(
         recordedBlob,
         fileName,
@@ -599,7 +605,8 @@ export default function Record() {
         rehearsal.title,
         (progress) => {
           setUploadProgress(progress);
-        }
+        },
+        rehearsal.drive_folder_id
       );
       
       if (!driveFile) {
@@ -989,7 +996,7 @@ export default function Record() {
             <div className="bg-red-50 border border-red-200 rounded p-3 flex items-start gap-2 text-sm">
               <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="font-medium text-red-800">Upload failed</p>
+                <p className="font-medium text-red-900">Upload failed</p>
                 <p className="text-red-700">{uploadError}</p>
                 <Button 
                   variant="outline" 

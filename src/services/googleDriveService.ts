@@ -334,10 +334,12 @@ class GoogleDriveService {
 
   /**
    * Ensure the folder hierarchy exists for a performance and rehearsal
+   * @deprecated Use createPerformanceFolder and createRehearsalFolder instead
    */
   public async ensureFolderStructure(performanceName: string, rehearsalName: string): Promise<string | null> {
     try {
-      console.log(`=== Creating folder structure for Performance: "${performanceName}", Rehearsal: "${rehearsalName}" ===`);
+      console.log(`=== [DEPRECATED] Creating folder structure for Performance: "${performanceName}", Rehearsal: "${rehearsalName}" ===`);
+      console.log("WARNING: ensureFolderStructure is deprecated. Use createPerformanceFolder and createRehearsalFolder instead");
       
       // Find or create the root StageVault folder
       const rootFolderId = await this.findOrCreateFolder(ROOT_FOLDER_NAME);
@@ -383,15 +385,26 @@ class GoogleDriveService {
     fileName: string, 
     performanceName: string, 
     rehearsalName: string,
-    onProgress?: UploadProgressCallback
+    onProgress?: UploadProgressCallback,
+    rehearsalFolderId?: string  // Added parameter for direct folder ID
   ): Promise<DriveFile | null> {
     try {
       const accessToken = await this.getAccessToken();
       if (!accessToken) return null;
       
-      // Ensure the folder structure exists
-      const parentFolderId = await this.ensureFolderStructure(performanceName, rehearsalName);
-      if (!parentFolderId) return null;
+      // Determine parent folder ID
+      let parentFolderId: string | null;
+      
+      if (rehearsalFolderId) {
+        // Use the provided rehearsal folder ID if available
+        console.log(`Using provided rehearsal folder ID: ${rehearsalFolderId}`);
+        parentFolderId = rehearsalFolderId;
+      } else {
+        // Fall back to the old method if no folder ID is provided
+        console.log("No rehearsal folder ID provided, using legacy folder structure method");
+        parentFolderId = await this.ensureFolderStructure(performanceName, rehearsalName);
+        if (!parentFolderId) return null;
+      }
       
       // Prepare the metadata
       const metadata = {
