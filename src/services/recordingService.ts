@@ -19,6 +19,32 @@ export interface UpdateRecordingData extends Partial<CreateRecordingData> {
 }
 
 export class RecordingService extends BaseService {
+  async getRecentRecordings(limit: number = 10): Promise<Recording[]> {
+    const { data, error } = await this.supabase
+      .from("recordings")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    
+    if (error) {
+      console.error("Error fetching recent recordings:", error);
+      return [];
+    }
+    
+    return data.map(r => ({
+      id: r.id,
+      rehearsalId: r.rehearsal_id,
+      title: r.title,
+      videoUrl: r.video_url || undefined,
+      thumbnailUrl: r.thumbnail_url || undefined,
+      duration: r.duration,
+      createdAt: r.created_at,
+      taggedUsers: r.tagged_users || [],
+      notes: r.notes || undefined,
+      tags: r.tags || []
+    }));
+  }
+
   async getRecordingsByRehearsalId(rehearsalId: string): Promise<Recording[]> {
     const { data, error } = await this.supabase
       .from("recordings")

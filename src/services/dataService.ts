@@ -59,6 +59,10 @@ class DataService {
   }
   
   // Recording methods
+  getRecentRecordings(limit?: number): Promise<Recording[]> {
+    return recordingService.getRecentRecordings(limit);
+  }
+  
   getRecordingsByRehearsalId(rehearsalId: string): Promise<Recording[]> {
     return recordingService.getRecordingsByRehearsalId(rehearsalId);
   }

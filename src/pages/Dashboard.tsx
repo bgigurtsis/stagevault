@@ -33,31 +33,13 @@ export default function Dashboard() {
         const performancesData = await performanceService.getPerformances();
         setPerformances(performancesData);
         
-        const allRehearsalIds = performancesData.flatMap(perf => 
-          Array(3).fill(perf.id)
-        );
-        
-        let recordingsData: Recording[] = [];
-        if (allRehearsalIds.length > 0) {
-          const recordingsPromises = allRehearsalIds.slice(0, 3).map(async (rehearsalId) => {
-            try {
-              const recordings = await recordingService.getRecordingsByRehearsalId(rehearsalId);
-              return recordings;
-            } catch (error) {
-              console.error(`Error fetching recordings for rehearsal ${rehearsalId}:`, error);
-              return [];
-            }
-          });
-          
-          const recordingResults = await Promise.all(recordingsPromises);
-          recordingsData = recordingResults.flat();
-          
-          recordingsData.sort((a, b) => 
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
+        try {
+          const recordingsData = await recordingService.getRecentRecordings();
+          setRecordings(recordingsData);
+        } catch (error) {
+          console.error("Error fetching recordings:", error);
+          setRecordings([]);
         }
-        
-        setRecordings(recordingsData);
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
         toast({
