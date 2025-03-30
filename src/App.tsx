@@ -15,6 +15,8 @@ import PerformanceNew from "./pages/PerformanceNew";
 import PerformanceEdit from "./pages/PerformanceEdit";
 import Rehearsals from "./pages/Rehearsals";
 import RehearsalDetail from "./pages/RehearsalDetail";
+import RehearsalNew from "./pages/RehearsalNew";
+import RehearsalEdit from "./pages/RehearsalEdit";
 import Record from "./pages/Record";
 import NotFound from "./pages/NotFound";
 
@@ -37,7 +39,9 @@ const App = () => (
               <Route path="/performances/:performanceId" element={<PerformanceDetail />} />
               <Route path="/performances/:performanceId/edit" element={<PerformanceEdit />} />
               <Route path="/rehearsals" element={<Rehearsals />} />
+              <Route path="/rehearsals/new" element={<RehearsalNew />} />
               <Route path="/rehearsals/:rehearsalId" element={<RehearsalDetail />} />
+              <Route path="/rehearsals/:rehearsalId/edit" element={<RehearsalEdit />} />
               <Route path="/record" element={<Record />} />
             </Route>
             <Route path="*" element={<NotFound />} />

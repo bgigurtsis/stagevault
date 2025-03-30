@@ -1,237 +1,236 @@
 
-import React, { useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { format } from "date-fns";
-import { ArrowLeft, Calendar, Clock, Users, Edit, Video, ChevronLeft, ChevronRight } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useNavigate, useParams, Link } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
+import { Rehearsal, Recording, Performance } from "@/types";
+import { rehearsalService } from "@/services/rehearsalService";
+import { performanceService } from "@/services/performanceService";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { useIsMobile } from "@/hooks/use-mobile";
-import MobileSwipeGesture from "@/components/MobileSwipeGesture";
-
-interface Recording {
-  id: string;
-  title: string;
-  duration: number; // in seconds
-  thumbnail: string;
-  createdAt: Date;
-}
-
-// This would normally come from an API call
-const getMockRehearsalData = (id: string) => {
-  return {
-    id,
-    title: "Dress Rehearsal",
-    description: "Final preparation before the show with full costumes and staging.",
-    date: new Date(2023, 5, 20),
-    performanceTitle: "Nutcracker",
-    performanceId: "p1",
-    participants: ["Anna Smith", "John Doe", "Sarah Williams", "Michael Brown"],
-    recordings: [
-      {
-        id: "r1",
-        title: "Opening Scene",
-        duration: 180, // 3 minutes
-        thumbnail: "https://placehold.co/600x400/stage-purple/white?text=Recording+1",
-        createdAt: new Date(2023, 5, 20, 14, 0)
-      },
-      {
-        id: "r2",
-        title: "Act I Scene 2",
-        duration: 240, // 4 minutes
-        thumbnail: "https://placehold.co/600x400/stage-deep-purple/white?text=Recording+2",
-        createdAt: new Date(2023, 5, 20, 14, 15)
-      },
-      {
-        id: "r3",
-        title: "Act II Scene 1",
-        duration: 300, // 5 minutes
-        thumbnail: "https://placehold.co/600x400/stage-purple/white?text=Recording+3",
-        createdAt: new Date(2023, 5, 20, 14, 30)
-      }
-    ]
-  };
-};
-
-const formatDuration = (seconds: number): string => {
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-};
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { format, parseISO } from "date-fns";
+import { ArrowLeft, Calendar, MapPin, Pencil, Trash, Video, Users } from "lucide-react";
 
 export default function RehearsalDetail() {
+  const [rehearsal, setRehearsal] = useState<Rehearsal | null>(null);
+  const [performance, setPerformance] = useState<Performance | null>(null);
+  const [recordings, setRecordings] = useState<Recording[]>([]);
+  const [loading, setLoading] = useState(true);
   const { rehearsalId } = useParams<{ rehearsalId: string }>();
-  const isMobile = useIsMobile();
-  const [currentRecordingIndex, setCurrentRecordingIndex] = useState(0);
-  
-  // In a real app, you would fetch this data from an API
-  const rehearsal = getMockRehearsalData(rehearsalId || "");
-  
-  const goToNextRecording = () => {
-    if (rehearsal.recordings.length > currentRecordingIndex + 1) {
-      setCurrentRecordingIndex(prev => prev + 1);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchRehearsalData = async () => {
+      if (!rehearsalId) return;
+
+      try {
+        // Fetch rehearsal details
+        const rehearsalData = await rehearsalService.getRehearsalById(rehearsalId);
+        setRehearsal(rehearsalData);
+
+        // Fetch associated performance
+        const performanceData = await performanceService.getPerformanceById(rehearsalData.performanceId);
+        setPerformance(performanceData);
+
+        // For now, we'll use mock recordings data
+        // In Phase 5, we'll implement the actual recordings fetching
+        setRecordings([]);
+      } catch (error) {
+        console.error("Error fetching rehearsal data:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load rehearsal details. Please try again.",
+          variant: "destructive",
+        });
+        navigate("/rehearsals");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRehearsalData();
+  }, [rehearsalId, navigate, toast]);
+
+  const handleDeleteRehearsal = async () => {
+    if (!rehearsalId) return;
+
+    try {
+      await rehearsalService.deleteRehearsal(rehearsalId);
+      toast({
+        title: "Success",
+        description: "Rehearsal deleted successfully.",
+      });
+      navigate(rehearsal?.performanceId ? `/performances/${rehearsal.performanceId}` : "/rehearsals");
+    } catch (error) {
+      console.error("Error deleting rehearsal:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete rehearsal. Please try again.",
+        variant: "destructive",
+      });
     }
   };
-  
-  const goToPrevRecording = () => {
-    if (currentRecordingIndex > 0) {
-      setCurrentRecordingIndex(prev => prev - 1);
-    }
-  };
-  
-  const Recording = ({ recording }: { recording: Recording }) => (
-    <Card className="h-full overflow-hidden">
-      <div className="relative aspect-video bg-muted">
-        <img 
-          src={recording.thumbnail} 
-          alt={recording.title} 
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-xs">
-          {formatDuration(recording.duration)}
+
+  if (loading) {
+    return (
+      <div className="container py-6 space-y-8">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-10 w-10 rounded-full" />
+          <Skeleton className="h-10 w-40" />
         </div>
+        <Skeleton className="h-[200px] w-full" />
+        <Skeleton className="h-[300px] w-full" />
       </div>
-      <CardContent className="p-4">
-        <h3 className="text-lg font-medium mb-2">{recording.title}</h3>
-        <p className="text-sm text-muted-foreground">
-          Recorded at {format(recording.createdAt, "h:mm a")}
-        </p>
-      </CardContent>
-    </Card>
-  );
+    );
+  }
+
+  if (!rehearsal) {
+    return (
+      <div className="container py-6">
+        <p>Rehearsal not found</p>
+        <Button onClick={() => navigate("/rehearsals")} className="mt-4">
+          Back to Rehearsals
+        </Button>
+      </div>
+    );
+  }
 
   return (
-    <MobileSwipeGesture
-      onSwipeLeft={goToNextRecording}
-      onSwipeRight={goToPrevRecording}
-      className="container mx-auto px-4 py-6 max-w-5xl"
-    >
-      <div className="space-y-6">
-        <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
-          <div className="flex items-center">
-            <Link to="/rehearsals">
-              <Button variant="ghost" size="icon" className="mr-2">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            </Link>
-            <h1 className="text-2xl font-bold">{rehearsal.title}</h1>
-          </div>
-          
-          <div className="flex space-x-2">
-            <Button variant="outline" size={isMobile ? "sm" : "default"}>
-              <Edit className="h-4 w-4 mr-1" />
-              {isMobile ? "" : "Edit"}
-            </Button>
-            <Link to="/record">
-              <Button size={isMobile ? "sm" : "default"}>
-                <Video className="h-4 w-4 mr-1" />
-                {isMobile ? "" : "Record"}
-              </Button>
-            </Link>
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-2 space-y-6">
-            <div className="bg-muted/20 p-4 rounded-lg">
-              <p>{rehearsal.description}</p>
-            </div>
-            
-            {/* Mobile-optimized recording carousel */}
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold">Recordings</h2>
-                <div className="flex items-center space-x-2">
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    onClick={goToPrevRecording}
-                    disabled={currentRecordingIndex === 0}
-                    className="h-8 w-8 md:h-10 md:w-10"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <span className="text-sm">
-                    {currentRecordingIndex + 1} / {rehearsal.recordings.length}
-                  </span>
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    onClick={goToNextRecording}
-                    disabled={currentRecordingIndex === rehearsal.recordings.length - 1}
-                    className="h-8 w-8 md:h-10 md:w-10"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              
-              {isMobile ? (
-                <div className="md:hidden">
-                  <Recording recording={rehearsal.recordings[currentRecordingIndex]} />
-                </div>
-              ) : (
-                <div className="hidden md:grid md:grid-cols-2 gap-4">
-                  {rehearsal.recordings.map(recording => (
-                    <Recording key={recording.id} recording={recording} />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-          
-          <div className="space-y-6">
-            <div className="bg-muted/10 p-4 rounded-lg space-y-4 border">
-              <h2 className="text-lg font-semibold">Details</h2>
-              
-              <div className="flex items-start gap-3">
-                <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">Date</p>
-                  <p className="text-sm text-muted-foreground">
-                    {format(rehearsal.date, "MMMM d, yyyy")}
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex items-start gap-3">
-                <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">Total Duration</p>
-                  <p className="text-sm text-muted-foreground">
-                    {formatDuration(rehearsal.recordings.reduce((total, r) => total + r.duration, 0))}
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex items-start gap-3">
-                <Users className="h-5 w-5 text-muted-foreground mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">Participants</p>
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {rehearsal.participants.map(participant => (
-                      <span 
-                        key={participant} 
-                        className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                      >
-                        {participant}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="border rounded-lg p-4">
-              <Link to={`/performances/${rehearsal.performanceId}`} className="block">
-                <h3 className="font-medium">Performance</h3>
-                <p className="text-primary underline-offset-4 hover:underline">
-                  {rehearsal.performanceTitle}
-                </p>
-              </Link>
-            </div>
-          </div>
-        </div>
+    <div className="container py-6 space-y-8">
+      <div className="flex items-center gap-4">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={() => rehearsal.performanceId ? navigate(`/performances/${rehearsal.performanceId}`) : navigate("/rehearsals")}
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <h1 className="text-3xl font-bold tracking-tight">{rehearsal.title}</h1>
       </div>
-    </MobileSwipeGesture>
+
+      <div className="flex flex-wrap gap-4 sm:gap-6 items-center">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-5 w-5 text-muted-foreground" />
+          <span>{rehearsal.date ? format(parseISO(rehearsal.date), "PPP") : "No date set"}</span>
+        </div>
+        {rehearsal.location && (
+          <div className="flex items-center gap-2">
+            <MapPin className="h-5 w-5 text-muted-foreground" />
+            <span>{rehearsal.location}</span>
+          </div>
+        )}
+        {performance && (
+          <div className="flex items-center gap-2">
+            <Link to={`/performances/${performance.id}`} className="hover:underline flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Part of:</span>
+              <span>{performance.title}</span>
+            </Link>
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-4">
+        <Button onClick={() => navigate(`/rehearsals/${rehearsalId}/edit`)} variant="outline" className="flex gap-2">
+          <Pencil className="h-4 w-4" /> Edit
+        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive" className="flex gap-2">
+              <Trash className="h-4 w-4" /> Delete
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete this rehearsal and all associated data. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteRehearsal}>Delete</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        <Button onClick={() => navigate(`/record?rehearsalId=${rehearsalId}`)} className="flex gap-2 ml-auto">
+          <Video className="h-4 w-4" /> Record
+        </Button>
+      </div>
+
+      {rehearsal.description && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Description</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="whitespace-pre-wrap">{rehearsal.description}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {rehearsal.notes && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Notes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="whitespace-pre-wrap">{rehearsal.notes}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      <div>
+        <h2 className="text-2xl font-bold mb-4">Recordings</h2>
+        {recordings.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <div className="text-center space-y-4">
+                <h3 className="text-xl font-semibold">No recordings yet</h3>
+                <p className="text-muted-foreground">Record your first video for this rehearsal.</p>
+                <Button onClick={() => navigate(`/record?rehearsalId=${rehearsalId}`)}>
+                  <Video className="mr-2 h-4 w-4" /> Start Recording
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {recordings.map((recording) => (
+              <Card key={recording.id}>
+                <CardHeader>
+                  <CardTitle>{recording.title}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {recording.thumbnailUrl && (
+                    <img 
+                      src={recording.thumbnailUrl} 
+                      alt={recording.title} 
+                      className="w-full h-40 object-cover rounded-md mb-4" 
+                    />
+                  )}
+                </CardContent>
+                <CardFooter>
+                  <Button variant="outline" className="w-full">
+                    View Recording
+                  </Button>
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
