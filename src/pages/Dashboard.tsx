@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Theater, ArrowRight, Clock, Plus, Calendar, Search, Video } from "lucide-react";
@@ -147,7 +148,18 @@ export default function Dashboard() {
         </div>
       </div>
       
-      
+      <div className="relative">
+        <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+          <Search className="h-5 w-5 text-muted-foreground" />
+        </div>
+        <Input
+          type="search"
+          placeholder="Search performances and recordings..."
+          className="pl-10"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
       
       <div>
         <div className="flex justify-between items-center mb-4">
