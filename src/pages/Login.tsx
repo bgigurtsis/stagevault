@@ -214,7 +214,7 @@ export default function Login() {
           <Video className="h-8 w-8 text-white" />
         </div>
         <h1 className="text-3xl font-bold tracking-tight">StageVault</h1>
-        <p className="text-muted-foreground mt-1">Rehearsal Video Recording & Management</p>
+        <p className="text-muted-foreground mt-1">Rehearsal Recording & Management</p>
       </div>
       
       <Card className="w-full max-w-md">
