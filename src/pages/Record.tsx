@@ -121,7 +121,7 @@ export default function Record() {
       setAvailableCameras(videoDevices);
       
       if (videoDevices.length > 0 && !selectedCameraId) {
-        setSelectedCameraId(videoDevices[0].deviceId);
+        setSelectedCameraId(videoDevices[0].deviceId || "default-camera");
         logDebug("Selected default camera", videoDevices[0].deviceId);
       }
       
@@ -1045,8 +1045,8 @@ export default function Record() {
                       </SelectTrigger>
                       <SelectContent>
                         {availableCameras.map((camera) => (
-                          <SelectItem key={camera.deviceId} value={camera.deviceId}>
-                            {camera.label || `Camera ${camera.deviceId.substring(0, 5)}...`}
+                          <SelectItem key={camera.deviceId} value={camera.deviceId || `camera-${camera.groupId}`}>
+                            {camera.label || `Camera ${camera.deviceId ? camera.deviceId.substring(0, 5) : "Default"}`}
                           </SelectItem>
                         ))}
                       </SelectContent>
