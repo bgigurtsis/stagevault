@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { 
@@ -27,6 +28,7 @@ import { performanceService } from "@/services/performanceService";
 import { rehearsalService } from "@/services/rehearsalService";
 import { Performance } from "@/types";
 import { RecordingForm } from "@/components/recording/RecordingForm";
+import { useIsMobile } from "@/hooks/use-mobile";
 import "./Record.css";
 
 export default function Record() {
@@ -40,7 +42,7 @@ export default function Record() {
   // UI state
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const isMobile = useIsMobile();
   
   // Camera state
   const [isInitializingCamera, setIsInitializingCamera] = useState(false);
@@ -75,20 +77,6 @@ export default function Record() {
   const rehearsalIdParam = searchParams.get('rehearsalId');
   const performanceIdParam = searchParams.get('performanceId');
   const { toast } = useToast();
-  
-  // Detect mobile devices
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    window.addEventListener('resize', handleResize);
-    handleResize();
-    
-    return () => {
-      window.removeEventListener('resize', handleResize);
-    };
-  }, []);
   
   // Handle orientation changes
   useEffect(() => {
@@ -617,6 +605,10 @@ export default function Record() {
       
       setIsRecording(false);
       setIsPaused(false);
+      
+      if (isFullscreen) {
+        exitFullscreen();
+      }
     }
   };
   
@@ -639,6 +631,8 @@ export default function Record() {
       videoRef.current.src = "";
       videoRef.current.controls = false;
     }
+    
+    startCamera();
   };
   
   const handleRetry = () => {
@@ -831,11 +825,11 @@ export default function Record() {
   
   return (
     <div 
-      className={`container py-6 ${isRecording ? 'max-w-full px-0' : 'max-w-6xl px-4'}`}
+      className={`record-container ${isRecording ? 'fullscreen-recording' : ''}`}
       ref={containerRef}
     >
       {!isRecording && !recordedBlob && (
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-4 px-4 pt-6">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
@@ -847,16 +841,16 @@ export default function Record() {
       )}
       
       {currentPerformance && !isRecording && !recordedBlob && (
-        <div className="mb-6">
+        <div className="mb-4 px-4">
           <Badge variant="outline" className="text-sm">
             For: {currentPerformance.title}
           </Badge>
         </div>
       )}
       
-      <div className="relative">
+      <div className={`camera-preview-container ${isRecording ? 'h-full' : ''}`}>
         <div 
-          className={`${isRecording || !recordedBlob ? 'aspect-video' : 'aspect-video lg:aspect-video'} 
+          className={`${isRecording ? 'h-full' : 'aspect-video'} 
                      bg-muted rounded-lg overflow-hidden relative`}
         >
           {!isRecording && !recordedBlob && !cameraAccessError && !isInitializingCamera && !streamRef.current && (
@@ -872,16 +866,14 @@ export default function Record() {
           )}
           
           {isInitializingCamera && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <div className="animate-pulse flex flex-col items-center">
-                <Camera className="h-12 w-12 text-primary mb-2" />
-                <p className="text-primary font-medium">
-                  Initializing camera...
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Please allow camera access when prompted
-                </p>
-              </div>
+            <div className="camera-initializing">
+              <Camera className="h-16 w-16 animate-pulse" />
+              <p className="font-medium text-xl">
+                Initializing camera...
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Please allow camera access when prompted
+              </p>
             </div>
           )}
           
@@ -894,7 +886,7 @@ export default function Record() {
                     <h3 className="font-semibold text-red-900">Camera Access Error</h3>
                     <p className="text-red-700 mt-1 text-sm">{cameraAccessError}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setCameraAccessError(null)}>
+                      <Button variant="outline" size="sm" onClick={() => startCamera()}>
                         Try Again
                       </Button>
                       <Button variant="outline" size="sm" onClick={attemptScreenshareWithCamera}>
@@ -948,7 +940,7 @@ export default function Record() {
         </div>
       </div>
       
-      <div className="flex justify-center my-6">
+      <div className="record-controls flex justify-center my-6">
         {!isRecording && !recordedBlob ? (
           <button 
             onClick={startRecording} 
@@ -998,7 +990,7 @@ export default function Record() {
       </div>
       
       {recordedBlob && !isUploading && (
-        <div className="bg-muted/40 border rounded p-3 text-sm flex items-center gap-2">
+        <div className="bg-muted/40 border rounded p-3 text-sm flex items-center gap-2 mx-4">
           <Clock className="h-4 w-4 text-muted-foreground" />
           <span>Recording length: {formatTime(recordingTime)}</span>
           <Badge variant="outline" className="ml-auto">{Math.round(recordedBlob.size / 1024 / 1024 * 10) / 10} MB</Badge>
@@ -1006,7 +998,7 @@ export default function Record() {
       )}
       
       {isUploading && (
-        <div className="bg-background border rounded-md p-4 space-y-3">
+        <div className="bg-background border rounded-md p-4 space-y-3 mx-4">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">
               {uploadPhase === 'preparing' && 'Preparing upload...'}
@@ -1053,7 +1045,7 @@ export default function Record() {
       )}
       
       {recordedBlob && (
-        <div className="mt-6">
+        <div className="mt-6 px-4">
           <form id="recording-form" className="space-y-4">
             <RecordingForm 
               isVisible={true}
