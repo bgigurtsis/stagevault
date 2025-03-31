@@ -14,8 +14,7 @@ import {
   Edit,
   Trash,
   MoreVertical,
-  Flag,
-  FolderPlus
+  Flag
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -45,7 +44,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuthContext";
 import { dataService } from "@/services/dataService";
-import { googleDriveService } from "@/services/googleDriveService";
 import { Performance, Rehearsal } from "@/types";
 
 export default function PerformanceDetail() {
@@ -56,7 +54,6 @@ export default function PerformanceDetail() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("overview");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isCreatingDriveFolder, setIsCreatingDriveFolder] = useState(false);
 
   // Fetch performance details
   const { 
@@ -146,44 +143,6 @@ export default function PerformanceDetail() {
     return new Date(b.date).getTime() - new Date(a.date).getTime();
   });
 
-  // Debug function to create Google Drive folder manually
-  const createGoogleDriveFolder = async () => {
-    if (!performance) {
-      toast({
-        title: "Error",
-        description: "Performance details not available",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsCreatingDriveFolder(true);
-    try {
-      const folderId = await googleDriveService.ensureFolderStructure(
-        performance.title, 
-        "Debug Test Rehearsal"
-      );
-      
-      if (folderId) {
-        toast({
-          title: "Folder Created",
-          description: "Google Drive folder has been created successfully",
-        });
-      } else {
-        throw new Error("Failed to create Google Drive folder");
-      }
-    } catch (error) {
-      console.error("Error creating Google Drive folder:", error);
-      toast({
-        title: "Error",
-        description: "Failed to create Google Drive folder. Check console for details.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsCreatingDriveFolder(false);
-    }
-  };
-
   if (isLoadingPerformance) {
     return (
       <div className="container py-6 space-y-6">
@@ -250,23 +209,6 @@ export default function PerformanceDetail() {
         </div>
         
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex items-center"
-            onClick={createGoogleDriveFolder}
-            disabled={isCreatingDriveFolder}
-          >
-            {isCreatingDriveFolder ? (
-              <>Creating Folder...</>
-            ) : (
-              <>
-                <FolderPlus className="mr-2 h-4 w-4" />
-                Test Drive Folder
-              </>
-            )}
-          </Button>
-          
           <Button 
             variant="outline"
             onClick={() => navigate(`/rehearsals/new?performanceId=${performance.id}`)}
