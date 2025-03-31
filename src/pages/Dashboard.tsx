@@ -126,7 +126,7 @@ export default function Dashboard() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button>
-                <Plus className="mr-2 h-4 w-4" />
+                <Plus className="mr-1 h-4 w-4" />
                 New
               </Button>
             </DropdownMenuTrigger>
@@ -233,7 +233,7 @@ export default function Dashboard() {
               </p>
               <Link to="/record">
                 <Button>
-                  <Search className="mr-2 h-4 w-4" />
+                  <Search className="mr-1 h-4 w-4" />
                   Record Video
                 </Button>
               </Link>
