@@ -13,6 +13,7 @@ export const useCamera = (options?: UseCameraOptions) => {
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
   const [usingFallbackMode, setUsingFallbackMode] = useState(false);
   const [flashEnabled, setFlashEnabled] = useState(false);
+  const [permissionState, setPermissionState] = useState<PermissionState | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -24,6 +25,31 @@ export const useCamera = (options?: UseCameraOptions) => {
     const timestamp = new Date().toISOString();
     const logMessage = `${timestamp} - ${message}`;
     console.log(logMessage, data);
+  };
+
+  // Check permission status
+  const checkPermissionStatus = async () => {
+    try {
+      // Check if the browser supports permissions API
+      if (navigator.permissions) {
+        const cameraPermission = await navigator.permissions.query({ name: 'camera' as PermissionName });
+        setPermissionState(cameraPermission.state);
+        
+        // Listen for permission changes
+        cameraPermission.addEventListener('change', () => {
+          setPermissionState(cameraPermission.state);
+          if (cameraPermission.state === 'granted') {
+            setCameraAccessError(null);
+            startCamera();
+          }
+        });
+        
+        return cameraPermission.state;
+      }
+    } catch (error) {
+      logDebug("Error checking permission status", error);
+    }
+    return null;
   };
   
   const enumerateDevices = async () => {
@@ -100,10 +126,24 @@ export const useCamera = (options?: UseCameraOptions) => {
     }
   };
   
+  const resetPermissions = async () => {
+    // We can't programmatically reset permissions, but we can guide the user
+    setCameraAccessError("Browser permissions can't be reset programmatically. Please follow these steps:\n1. Click the lock/camera icon in your address bar\n2. Reset permissions for this site\n3. Refresh the page");
+    
+    toast({
+      title: "Permission Reset Instructions",
+      description: "Please check the camera icon in your browser's address bar to reset permissions.",
+      duration: 6000,
+    });
+  };
+  
   const startCamera = async (deviceId?: string) => {
     try {
       setCameraAccessError(null);
       setIsInitializingCamera(true);
+      
+      // Check permission status first
+      await checkPermissionStatus();
       
       const stream = await tryAccessCamera(1, deviceId);
       
@@ -127,6 +167,7 @@ export const useCamera = (options?: UseCameraOptions) => {
       if (error instanceof Error) {
         if (error.name === "NotAllowedError") {
           errorMessage = "Camera access denied. Please allow access in your browser settings and try again.";
+          await checkPermissionStatus(); // Update permission state
         } else if (error.name === "NotFoundError") {
           errorMessage = "No camera detected. Please connect a camera and try again.";
         } else if (error.name === "NotReadableError") {
@@ -279,12 +320,15 @@ export const useCamera = (options?: UseCameraOptions) => {
     availableCameras,
     flashEnabled,
     usingFallbackMode,
+    permissionState,
     startCamera,
     stopCamera,
     switchCamera,
     toggleFlash,
     enumerateDevices,
     attemptScreenshareWithCamera,
-    setCameraAccessError
+    setCameraAccessError,
+    resetPermissions,
+    checkPermissionStatus
   };
 };

@@ -46,7 +46,9 @@ export default function Record() {
     switchCamera,
     toggleFlash,
     attemptScreenshareWithCamera,
-    setCameraAccessError
+    setCameraAccessError,
+    resetPermissions,
+    checkPermissionStatus
   } = useCamera();
   
   const {
@@ -117,7 +119,7 @@ export default function Record() {
     loadPerformanceContext();
   }, [performanceIdParam, rehearsalIdParam]);
   
-  // Handle orientation changes
+  // Handle orientation changes and fullscreen behavior
   useEffect(() => {
     const handleOrientationChange = () => {
       if (isRecording && window.matchMedia("(orientation: landscape)").matches) {
@@ -128,15 +130,28 @@ export default function Record() {
     
     window.addEventListener('orientationchange', handleOrientationChange);
     
+    // Add class to body when recording to prevent scrolling
+    if (isRecording) {
+      document.body.classList.add('recording-active');
+    } else {
+      document.body.classList.remove('recording-active');
+    }
+    
     return () => {
       window.removeEventListener('orientationchange', handleOrientationChange);
+      document.body.classList.remove('recording-active');
     };
   }, [isRecording, requestFullscreen]);
   
   // Initialize camera and check browser compatibility
   useEffect(() => {
     checkBrowserCompatibility();
-    startCamera();
+    
+    // Use a timeout to allow the component to fully mount
+    const initTimer = setTimeout(() => {
+      startCamera();
+      checkPermissionStatus();
+    }, 500);
     
     // Force fullscreen mode on mobile
     if (isMobile) {
@@ -147,8 +162,13 @@ export default function Record() {
       return () => {
         rootElement.style.height = '';
         rootElement.style.overflow = '';
+        clearTimeout(initTimer);
       };
     }
+    
+    return () => {
+      clearTimeout(initTimer);
+    };
   }, []);
   
   // Handle recording start
@@ -181,6 +201,12 @@ export default function Record() {
     if (recordedBlob && formElement) {
       saveRecording(recordedBlob, formElement);
     }
+  };
+
+  // Handle retry camera access
+  const handleRetryCamera = () => {
+    setCameraAccessError(null);
+    startCamera();
   };
   
   return (
@@ -230,8 +256,9 @@ export default function Record() {
           {cameraAccessError && (
             <CameraError 
               errorMessage={cameraAccessError}
-              onRetry={() => startCamera()}
+              onRetry={handleRetryCamera}
               onScreenShare={attemptScreenshareWithCamera}
+              onResetPermissions={resetPermissions}
             />
           )}
 
@@ -310,7 +337,8 @@ export default function Record() {
       />
       
       {recordedBlob && (
-        <div className="mt-6 px-4">
+        <div className={`recording-form-container ${!isFormVisible ? 'hidden' : ''}`}>
+          <div className="recording-form-handle" onClick={toggleFormVisibility}></div>
           <form id="recording-form" className="space-y-4">
             <RecordingForm 
               isVisible={isFormVisible}
