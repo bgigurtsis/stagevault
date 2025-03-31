@@ -1,7 +1,6 @@
 
 import React from "react";
-import { FlipHorizontal, Zap } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { FlipHorizontal, Zap, Grid } from "lucide-react";
 
 interface CameraControlsProps {
   onSwitchCamera: () => void;
@@ -15,24 +14,22 @@ const CameraControls: React.FC<CameraControlsProps> = ({
   flashEnabled
 }) => {
   return (
-    <div className="absolute bottom-4 right-4 flex gap-2">
-      <Button 
-        variant="secondary" 
-        size="icon"
-        className="bg-black/30 hover:bg-black/50 text-white rounded-full h-10 w-10"
-        onClick={onSwitchCamera}
-      >
-        <FlipHorizontal className="h-5 w-5" />
-      </Button>
-      
-      <Button 
-        variant="secondary" 
-        size="icon"
-        className={`${flashEnabled ? 'bg-yellow-500/70 hover:bg-yellow-500/90' : 'bg-black/30 hover:bg-black/50'} text-white rounded-full h-10 w-10`}
+    <div className="flex items-center gap-4">
+      <button 
+        className={`camera-control-btn ${flashEnabled ? 'active' : ''}`}
         onClick={onToggleFlash}
+        aria-label={flashEnabled ? "Disable flash" : "Enable flash"}
       >
         <Zap className="h-5 w-5" />
-      </Button>
+      </button>
+      
+      <button 
+        className="camera-control-btn"
+        onClick={onSwitchCamera}
+        aria-label="Switch camera"
+      >
+        <FlipHorizontal className="h-5 w-5" />
+      </button>
     </div>
   );
 };

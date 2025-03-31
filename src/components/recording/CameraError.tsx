@@ -1,6 +1,6 @@
 
 import React from "react";
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface CameraErrorProps {
@@ -15,7 +15,7 @@ const CameraError: React.FC<CameraErrorProps> = ({
   onScreenShare 
 }) => {
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
+    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 p-4">
       <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-w-md">
         <div className="flex gap-3 items-start">
           <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />

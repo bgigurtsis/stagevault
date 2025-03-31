@@ -185,17 +185,12 @@ export const useCamera = (options?: UseCameraOptions) => {
       
       const newFlashState = !flashEnabled;
       
-      // The correct way to apply torch constraints
-      // TypeScript doesn't recognize 'torch' as a standard property on MediaTrackConstraintSet
-      // So we need to use a type assertion to apply it
-      const constraints: MediaTrackConstraintSet = {};
-      if ('torch' in capabilities) {
-        // Use type assertion to avoid TypeScript error
-        (constraints as any).torch = newFlashState;
-      }
+      // Use type assertion to avoid TypeScript error for the torch property
+      const advancedConstraints = [{} as MediaTrackConstraintSet];
+      (advancedConstraints[0] as any).torch = newFlashState;
       
       await videoTrack.applyConstraints({
-        advanced: [constraints]
+        advanced: advancedConstraints
       });
       
       setFlashEnabled(newFlashState);

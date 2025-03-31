@@ -1,8 +1,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Video, ArrowLeft, AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Video, ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { performanceService } from "@/services/performanceService";
@@ -133,12 +132,19 @@ export default function Record() {
   useEffect(() => {
     checkBrowserCompatibility();
     startCamera();
+    
+    // Force fullscreen mode on mobile
+    if (isMobile) {
+      const rootElement = document.documentElement;
+      rootElement.style.height = '100vh';
+      rootElement.style.overflow = 'hidden';
+      
+      return () => {
+        rootElement.style.height = '';
+        rootElement.style.overflow = '';
+      };
+    }
   }, []);
-  
-  // Toggle form visibility (for after recording)
-  const toggleFormVisibility = () => {
-    setIsFormVisible(!isFormVisible);
-  };
   
   // Handle recording start
   const handleStartRecording = () => {
@@ -174,41 +180,41 @@ export default function Record() {
   
   return (
     <div 
-      className={`record-container ${isRecording ? 'fullscreen-recording' : ''}`}
+      className={`record-container ${isRecording || recordedBlob ? 'fullscreen-recording' : ''}`}
       ref={containerRef}
     >
       {!isRecording && !recordedBlob && (
-        <div className="flex items-center gap-2 mb-4 px-4 pt-6">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+        <div className="top-nav">
+          <button 
+            className="bg-black/30 text-white p-2 rounded-full"
+            onClick={() => navigate(-1)}
+          >
             <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Video className="h-6 w-6 text-destructive" />
+          </button>
+          <h1 className="ml-3 text-xl font-bold flex items-center gap-2 text-white">
+            <Video className="h-5 w-5 text-red-500" />
             <span>Record Video</span>
           </h1>
         </div>
       )}
       
       {currentPerformance && !isRecording && !recordedBlob && (
-        <div className="mb-4 px-4">
-          <Badge variant="outline" className="text-sm">
+        <div className="performance-badge">
+          <Badge className="bg-primary/90 text-white px-3 py-1">
             For: {currentPerformance.title}
           </Badge>
         </div>
       )}
       
-      <div className={`camera-preview-container ${isRecording ? 'h-full' : ''}`}>
-        <div 
-          className={`${isRecording ? 'h-full' : 'aspect-video'} 
-                     bg-muted rounded-lg overflow-hidden relative`}
-        >
+      <div className="camera-preview-container">
+        <div className="camera-view">
           {!isRecording && !recordedBlob && !cameraAccessError && !isInitializingCamera && !streamRef.current && (
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <Video className="h-12 w-12 text-muted-foreground/50 mb-2" />
-              <p className="text-muted-foreground font-medium">
+              <Video className="h-12 w-12 text-white/50 mb-2" />
+              <p className="text-white font-medium">
                 Ready to record your performance
               </p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-white/70">
                 Press the record button below to start
               </p>
             </div>
@@ -238,27 +244,54 @@ export default function Record() {
               isPaused={isPaused}
             />
           )}
-          
-          {!isRecording && !recordedBlob && streamRef.current && (
-            <CameraControls 
-              onSwitchCamera={switchCamera}
-              onToggleFlash={toggleFlash}
-              flashEnabled={flashEnabled}
-            />
-          )}
         </div>
+        
+        {!isFormVisible && (
+          <div className="control-bar">
+            {!isRecording && !recordedBlob && streamRef.current && (
+              <div className="camera-controls">
+                <CameraControls 
+                  onSwitchCamera={switchCamera}
+                  onToggleFlash={toggleFlash}
+                  flashEnabled={flashEnabled}
+                />
+                
+                <RecordingControls 
+                  isRecording={isRecording}
+                  isPaused={isPaused}
+                  recordedBlob={recordedBlob}
+                  recordingTime={recordingTime}
+                  onStartRecording={handleStartRecording}
+                  onPauseRecording={pauseRecording}
+                  onStopRecording={stopRecording}
+                  onResetRecording={resetRecording}
+                />
+              </div>
+            )}
+            
+            {isRecording && (
+              <div className="camera-controls">
+                <RecordingControls 
+                  isRecording={isRecording}
+                  isPaused={isPaused}
+                  recordedBlob={recordedBlob}
+                  recordingTime={recordingTime}
+                  onStartRecording={handleStartRecording}
+                  onPauseRecording={pauseRecording}
+                  onStopRecording={stopRecording}
+                  onResetRecording={resetRecording}
+                />
+                
+                <CameraControls 
+                  onSwitchCamera={switchCamera}
+                  onToggleFlash={toggleFlash}
+                  flashEnabled={flashEnabled}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
-      
-      <RecordingControls 
-        isRecording={isRecording}
-        isPaused={isPaused}
-        recordedBlob={recordedBlob}
-        recordingTime={recordingTime}
-        onStartRecording={handleStartRecording}
-        onPauseRecording={pauseRecording}
-        onStopRecording={stopRecording}
-        onResetRecording={resetRecording}
-      />
       
       <UploadProgress 
         isUploading={isUploading}

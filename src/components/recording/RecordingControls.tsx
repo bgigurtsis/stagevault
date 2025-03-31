@@ -1,7 +1,6 @@
 
 import React from "react";
 import { Play, Pause, StopCircle, RotateCcw } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { formatTime } from "@/utils/cameraUtils";
 
 interface RecordingControlsProps {
@@ -26,7 +25,7 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
   onResetRecording
 }) => {
   return (
-    <div className="record-controls flex justify-center my-6">
+    <>
       {!isRecording && !recordedBlob ? (
         <button 
           onClick={onStartRecording} 
@@ -36,43 +35,39 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
           <div className="record-btn-inner" />
         </button>
       ) : isRecording ? (
-        <div className="flex items-center gap-4">
-          <Button
-            size="icon"
-            variant="outline"
-            className="h-12 w-12 rounded-full"
+        <div className="flex items-center gap-6">
+          <button
+            className="camera-control-btn"
             onClick={onPauseRecording}
             aria-label={isPaused ? "Resume recording" : "Pause recording"}
           >
             {isPaused ? (
-              <Play className="h-6 w-6" />
+              <Play className="h-5 w-5" />
             ) : (
-              <Pause className="h-6 w-6" />
+              <Pause className="h-5 w-5" />
             )}
-          </Button>
-          <Button
-            size="icon"
-            variant="destructive"
-            className="h-14 w-14 rounded-full"
+          </button>
+          
+          <button
+            className="record-btn"
             onClick={onStopRecording}
             aria-label="Stop recording"
           >
-            <StopCircle className="h-8 w-8" />
-          </Button>
+            <div className="record-btn-inner flex items-center justify-center">
+              <div className="w-5 h-5 bg-white rounded-sm" />
+            </div>
+          </button>
         </div>
       ) : recordedBlob ? (
-        <div className="flex items-center gap-4">
-          <Button
-            variant="outline"
-            onClick={onResetRecording}
-            className="flex items-center gap-2"
-          >
-            <RotateCcw className="h-4 w-4" />
-            Record Again
-          </Button>
-        </div>
+        <button
+          className="bg-white/20 text-white px-4 py-2 rounded-full flex items-center gap-2"
+          onClick={onResetRecording}
+        >
+          <RotateCcw className="h-4 w-4" />
+          Record Again
+        </button>
       ) : null}
-    </div>
+    </>
   );
 };
 
