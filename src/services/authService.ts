@@ -8,17 +8,43 @@ import { mockUsers, extractUserInfo } from "@/utils/authUtils";
  */
 export class AuthService {
   /**
-   * Log in with email and password (mock implementation)
+   * Log in with email and password
    */
   async login(email: string, password: string): Promise<User> {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const user = mockUsers.find(u => u.email === email);
-    
-    if (user) {
-      return user;
-    } else {
-      throw new Error("Invalid credentials");
+    try {
+      console.log("=== Email/password login started ===");
+      console.log("Email:", email);
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      
+      if (error) {
+        console.error("Auth error:", error);
+        throw error;
+      }
+      
+      if (!data.user) {
+        throw new Error("User not found");
+      }
+      
+      console.log("Login successful for user:", data.user.id);
+      return extractUserInfo(data.user);
+    } catch (error) {
+      console.error("Login error in service:", error);
+      
+      // Fallback to mock users for development (will be removed in production)
+      if (process.env.NODE_ENV === 'development') {
+        console.log("Attempting fallback to mock users for development");
+        const mockUser = mockUsers.find(u => u.email === email);
+        if (mockUser) {
+          console.log("Found mock user:", mockUser);
+          return mockUser;
+        }
+      }
+      
+      throw error;
     }
   }
 
@@ -86,24 +112,63 @@ export class AuthService {
   }
 
   /**
-   * Sign up a new user (mock implementation)
+   * Sign up a new user
    */
   async signup(name: string, email: string, password: string, role?: "performer" | "choreographer"): Promise<User> {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    if (mockUsers.some(u => u.email === email)) {
-      throw new Error("Email already in use");
+    try {
+      console.log("=== Signup started ===");
+      console.log("Email:", email);
+      console.log("Name:", name);
+      console.log("Role:", role);
+      
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+            role: role || "performer"
+          }
+        }
+      });
+      
+      if (error) {
+        console.error("Signup error:", error);
+        throw error;
+      }
+      
+      if (!data.user) {
+        throw new Error("Failed to create user");
+      }
+      
+      console.log("Signup successful for user:", data.user.id);
+      return extractUserInfo(data.user);
+    } catch (error) {
+      console.error("Signup error in service:", error);
+      
+      // Fallback to mock users for development (will be removed in production)
+      if (process.env.NODE_ENV === 'development') {
+        console.log("Using mock signup for development");
+        
+        // Check if email already exists in mock data
+        if (mockUsers.some(u => u.email === email)) {
+          throw new Error("Email already in use");
+        }
+        
+        const newUser: User = {
+          id: String(mockUsers.length + 1),
+          name,
+          email,
+          profilePicture: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`,
+          role: role || "performer"
+        };
+        
+        console.log("Created mock user:", newUser);
+        return newUser;
+      }
+      
+      throw error;
     }
-    
-    const newUser: User = {
-      id: String(mockUsers.length + 1),
-      name,
-      email,
-      profilePicture: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`,
-      role: role || "performer"
-    };
-    
-    return newUser;
   }
 
   /**
