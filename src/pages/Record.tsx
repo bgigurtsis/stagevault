@@ -84,6 +84,11 @@ export default function Record() {
     handleRetry
   } = useUpload({ recordingTime });
   
+  // Toggle form visibility function
+  const toggleFormVisibility = () => {
+    setIsFormVisible(!isFormVisible);
+  };
+  
   // Load performance context
   useEffect(() => {
     const loadPerformanceContext = async () => {
@@ -308,7 +313,7 @@ export default function Record() {
         <div className="mt-6 px-4">
           <form id="recording-form" className="space-y-4">
             <RecordingForm 
-              isVisible={true}
+              isVisible={isFormVisible}
               recordingTime={recordingTime} 
               onSaveRecording={handleSaveRecording}
               isUploading={isUploading}
