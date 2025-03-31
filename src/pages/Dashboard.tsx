@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -12,6 +11,7 @@ import { performanceService } from "@/services/performanceService";
 import { recordingService } from "@/services/recordingService";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PerformanceThumbnail } from "@/components/performance/PerformanceThumbnail";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,7 +24,6 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Fetch performances with React Query
   const {
     data: performances = [],
     isLoading: isLoadingPerformances,
@@ -42,7 +41,6 @@ export default function Dashboard() {
     }
   });
 
-  // Fetch recordings with React Query
   const {
     data: recordings = [],
     isLoading: isLoadingRecordings,
@@ -77,7 +75,6 @@ export default function Dashboard() {
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  // Handle retrying failed requests
   const handleRetry = () => {
     if (performancesError) refetchPerformances();
     if (recordingsError) refetchRecordings();
@@ -230,9 +227,10 @@ export default function Dashboard() {
           </Card> : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {recentPerformances.map(performance => <Card key={performance.id} className="flex flex-col overflow-hidden">
                 <Link to={`/performances/${performance.id}`} className="group">
-                  <div className="aspect-video bg-muted flex items-center justify-center p-4">
-                    <Theater className="h-12 w-12 text-muted-foreground/50" />
-                  </div>
+                  <PerformanceThumbnail 
+                    title={performance.title} 
+                    className="w-full"
+                  />
                   <CardHeader className="p-4 pb-2">
                     <CardTitle className="text-lg">{performance.title}</CardTitle>
                     {performance.description && <CardDescription className="line-clamp-2">
