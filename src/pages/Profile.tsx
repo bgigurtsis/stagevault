@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, User, Check, AlertCircle, HardDrive } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,11 +16,7 @@ export default function Profile() {
   const [isCheckingDrive, setIsCheckingDrive] = useState(false);
   const [isDriveConnected, setIsDriveConnected] = useState<boolean | null>(null);
 
-  // Check Google Drive connection status when the page loads
-  useState(() => {
-    checkDriveConnection();
-  });
-
+  // Define the checkDriveConnection function before using it
   const checkDriveConnection = async () => {
     setIsCheckingDrive(true);
     try {
@@ -33,6 +29,11 @@ export default function Profile() {
       setIsCheckingDrive(false);
     }
   };
+
+  // Use useEffect instead of useState for initialization
+  useEffect(() => {
+    checkDriveConnection();
+  }, []);
 
   const handleConnectDrive = async () => {
     try {
