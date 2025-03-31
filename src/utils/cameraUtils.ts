@@ -117,8 +117,8 @@ export const getDeviceInfo = (): Record<string, string | boolean> => {
     language: navigator.language,
     isOnline: navigator.onLine,
     screen: `${window.screen.width}x${window.screen.height}`,
-    colorDepth: window.screen.colorDepth,
-    devicePixelRatio: window.devicePixelRatio,
+    colorDepth: String(window.screen.colorDepth), // Convert number to string
+    devicePixelRatio: String(window.devicePixelRatio), // Convert number to string
     isMobile: /iPhone|iPad|iPod|Android/i.test(navigator.userAgent),
     isIOS: /iPhone|iPad|iPod/i.test(navigator.userAgent),
     isAndroid: /Android/i.test(navigator.userAgent),
