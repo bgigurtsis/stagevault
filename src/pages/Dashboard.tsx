@@ -1,7 +1,6 @@
-
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Theater, ArrowRight, Clock, Plus, Calendar, Search, User, AlertCircle } from "lucide-react";
+import { Theater, ArrowRight, Clock, Plus, Calendar, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,22 +10,17 @@ import { performanceService } from "@/services/performanceService";
 import { recordingService } from "@/services/recordingService";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-
 export default function Dashboard() {
   const {
-    currentUser,
-    isDriveConnected
+    currentUser
   } = useAuth();
-  
   const {
     toast
   } = useToast();
-  
   const [searchQuery, setSearchQuery] = useState("");
   const [performances, setPerformances] = useState<Performance[]>([]);
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
   useEffect(() => {
     const fetchDashboardData = async () => {
       setIsLoading(true);
@@ -53,24 +47,20 @@ export default function Dashboard() {
     };
     fetchDashboardData();
   }, [toast]);
-  
   const recentPerformances = performances.slice(0, 3);
   const recentRecordings = recordings.slice(0, 3);
-  
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric"
     });
   };
-  
   const formatTime = (seconds: number | undefined) => {
     if (!seconds) return "00:00";
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
-  
   if (isLoading) {
     return <div className="container max-w-6xl py-6 space-y-8">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -107,7 +97,6 @@ export default function Dashboard() {
         </div>
       </div>;
   }
-  
   return <div className="container max-w-6xl py-6 space-y-8">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -117,12 +106,6 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Link to="/profile">
-            <Button variant="outline" className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              Profile
-            </Button>
-          </Link>
           <Link to="/performances">
             <Button variant="outline">View Performances</Button>
           </Link>
@@ -135,29 +118,7 @@ export default function Dashboard() {
         </div>
       </div>
       
-      {!isDriveConnected && (
-        <Card className="bg-amber-50 border-amber-200">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-amber-600" />
-              Google Drive Not Connected
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>To create performances and store recordings, you need to connect your Google Drive account.</p>
-          </CardContent>
-          <CardFooter>
-            <Link to="/profile">
-              <Button>Connect Google Drive</Button>
-            </Link>
-          </CardFooter>
-        </Card>
-      )}
       
-      <div className="relative">
-        <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
-        <Input placeholder="Search across people, performances, rehearsals, and recordings..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 py-6 text-lg" />
-      </div>
       
       <div>
         <div className="flex justify-between items-center mb-4">
