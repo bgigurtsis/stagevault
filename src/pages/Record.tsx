@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { 
@@ -13,7 +12,10 @@ import {
   Camera,
   RefreshCw,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  RotateCcw,
+  Zap,
+  FlipHorizontal
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -21,8 +23,9 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { recordingService } from "@/services/recordingService";
 import { googleDriveService } from "@/services/googleDriveService";
-import { RecordingForm } from "@/components/recording/RecordingForm";
-import { RecordingBreadcrumb } from "@/components/recording/RecordingBreadcrumb";
+import { performanceService } from "@/services/performanceService";
+import { rehearsalService } from "@/services/rehearsalService";
+import { Performance } from "@/types";
 import "./Record.css";
 
 export default function Record() {
@@ -44,6 +47,10 @@ export default function Record() {
   const [selectedCameraId, setSelectedCameraId] = useState<string>("");
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
   const [usingFallbackMode, setUsingFallbackMode] = useState(false);
+  const [flashEnabled, setFlashEnabled] = useState(false);
+  
+  // Performance context
+  const [currentPerformance, setCurrentPerformance] = useState<Performance | null>(null);
   
   // Upload state
   const [isLoading, setIsLoading] = useState(false);
@@ -65,6 +72,7 @@ export default function Record() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const rehearsalIdParam = searchParams.get('rehearsalId');
+  const performanceIdParam = searchParams.get('performanceId');
   const { toast } = useToast();
   
   // Detect mobile devices
@@ -97,6 +105,34 @@ export default function Record() {
     };
   }, [isRecording]);
   
+  // Load performance context
+  useEffect(() => {
+    const loadPerformanceContext = async () => {
+      try {
+        if (performanceIdParam) {
+          const performance = await performanceService.getPerformance(performanceIdParam);
+          setCurrentPerformance(performance);
+        } else if (rehearsalIdParam) {
+          const rehearsal = await rehearsalService.getRehearsal(rehearsalIdParam);
+          if (rehearsal.performanceId) {
+            const performance = await performanceService.getPerformance(rehearsal.performanceId);
+            setCurrentPerformance(performance);
+          }
+        } else {
+          // Load most recent performance if no context
+          const performances = await performanceService.getPerformances();
+          if (performances.length > 0) {
+            setCurrentPerformance(performances[0]);
+          }
+        }
+      } catch (error) {
+        console.error("Error loading performance context:", error);
+      }
+    };
+    
+    loadPerformanceContext();
+  }, [performanceIdParam, rehearsalIdParam]);
+  
   // Handle fullscreen changes
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -128,7 +164,7 @@ export default function Record() {
     }
   };
   
-  // Toggle form visibility (for mobile)
+  // Toggle form visibility (for after recording)
   const toggleFormVisibility = () => {
     setIsFormVisible(!isFormVisible);
   };
@@ -207,128 +243,95 @@ export default function Record() {
     return browserName;
   };
   
-  // Recording functions
-  const startRecording = async () => {
+  const switchCamera = async () => {
+    if (isRecording) return;
+    
+    // Stop existing camera stream
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+    }
+    
+    // Update camera selection to next available camera
+    const cameras = await enumerateDevices();
+    if (cameras.length <= 1) return;
+    
+    const currentIndex = cameras.findIndex(camera => camera.deviceId === selectedCameraId);
+    const nextIndex = (currentIndex + 1) % cameras.length;
+    const nextCamera = cameras[nextIndex];
+    
+    setSelectedCameraId(nextCamera.deviceId);
+    startCamera(nextCamera.deviceId);
+  };
+  
+  const toggleFlash = async () => {
+    if (!streamRef.current) return;
+    
+    try {
+      const videoTrack = streamRef.current.getVideoTracks()[0];
+      if (!videoTrack) return;
+      
+      const capabilities = videoTrack.getCapabilities();
+      if (!capabilities.torch) {
+        toast({
+          title: "Flash not supported",
+          description: "Your camera does not support flash/torch mode",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const newFlashState = !flashEnabled;
+      await videoTrack.applyConstraints({
+        advanced: [{ torch: newFlashState }]
+      });
+      
+      setFlashEnabled(newFlashState);
+      
+      toast({
+        title: newFlashState ? "Flash enabled" : "Flash disabled",
+        duration: 1500,
+      });
+    } catch (error) {
+      console.error("Error toggling flash:", error);
+      toast({
+        title: "Flash control failed",
+        description: "Unable to control flash. Your device may not support this feature.",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const startCamera = async (deviceId?: string) => {
     try {
       setCameraAccessError(null);
       setIsInitializingCamera(true);
       
-      logDebug("Starting camera initialization");
+      const stream = await tryAccessCamera(1, deviceId);
       
-      const timeoutPromise = new Promise<MediaStream>((_, reject) => {
-        setTimeout(() => {
-          logDebug("Camera access timeout reached");
-          reject(new Error("Camera access timeout - please check your browser settings"));
-        }, 10000);
-      });
-      
-      await enumerateDevices();
-      
-      const accessPromise = tryAccessCamera(1, selectedCameraId || undefined);
-      
-      const stream = await Promise.race([accessPromise, timeoutPromise]);
-      
-      logDebug("Camera access granted successfully");
       setIsInitializingCamera(false);
       streamRef.current = stream;
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.onloadedmetadata = () => {
-          logDebug("Video metadata loaded");
           videoRef.current?.play().catch(err => {
-            logDebug("Error playing video", err);
             setCameraAccessError("Error playing video stream. Please refresh and try again.");
           });
         };
       }
-      
-      chunksRef.current = [];
-      
-      const mimeType = getSupportedMimeType();
-      logDebug("Using mime type", mimeType);
-      
-      const options: MediaRecorderOptions = {
-        mimeType: mimeType,
-        audioBitsPerSecond: 128000,
-        videoBitsPerSecond: 2500000
-      };
-      
-      const mediaRecorder = new MediaRecorder(stream, options);
-      mediaRecorderRef.current = mediaRecorder;
-      
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunksRef.current.push(e.data);
-          logDebug("Received data chunk", { size: e.data.size });
-        }
-      };
-      
-      mediaRecorder.onstop = () => {
-        logDebug("Media recorder stopped");
-        const blob = new Blob(chunksRef.current, { type: mimeType });
-        const url = URL.createObjectURL(blob);
-        setRecordedBlob(blob);
-        setVideoUrl(url);
-        
-        if (videoRef.current) {
-          videoRef.current.srcObject = null;
-          videoRef.current.src = url;
-          videoRef.current.controls = true;
-        }
-        
-        // On mobile, show the form after recording
-        if (isMobile) {
-          setIsFormVisible(true);
-        }
-        
-        // Exit fullscreen when recording ends
-        exitFullscreen();
-      };
-      
-      mediaRecorder.start(1000);
-      logDebug("Media recorder started");
-      setIsRecording(true);
-      setIsPaused(false);
-      
-      // Hide the form when recording on mobile
-      if (isMobile) {
-        setIsFormVisible(false);
-        
-        // Enter fullscreen when recording on mobile
-        if (window.matchMedia("(orientation: landscape)").matches) {
-          requestFullscreen();
-        }
-      }
-      
-      timerRef.current = window.setInterval(() => {
-        setRecordingTime(prev => prev + 1);
-      }, 1000);
-      
     } catch (error) {
-      console.error("Error accessing media devices:", error);
+      console.error("Error accessing camera:", error);
       setIsInitializingCamera(false);
       
       let errorMessage = "Failed to access camera and microphone.";
       
       if (error instanceof Error) {
-        logDebug("Camera access error details", { 
-          message: error.message, 
-          name: error.name
-        });
-        
-        if (error.name === "NotAllowedError" || error.message.includes("Permission denied")) {
+        if (error.name === "NotAllowedError") {
           errorMessage = "Camera access denied. Please allow access in your browser settings and try again.";
-        } else if (error.name === "NotFoundError" || error.message.includes("Requested device not found")) {
+        } else if (error.name === "NotFoundError") {
           errorMessage = "No camera detected. Please connect a camera and try again.";
-        } else if (error.name === "NotReadableError" || error.message.includes("The device is in use")) {
+        } else if (error.name === "NotReadableError") {
           errorMessage = "Camera is in use by another application. Please close other apps using your camera.";
-        } else if (error.name === "AbortError" || error.message.includes("Timeout")) {
-          errorMessage = "Camera access timed out. Try increasing the timeout or check your browser settings.";
-        } else if (error.name === "TypeError" || error.message.includes("constraint")) {
-          errorMessage = "Your camera doesn't support the required quality settings. Try a different device.";
-        } else if (error.name === "SecurityError" || error.message.includes("secure context")) {
-          errorMessage = "Camera access requires a secure connection (HTTPS).";
         }
       }
       
@@ -452,10 +455,7 @@ export default function Record() {
           videoRef.current.controls = true;
         }
         
-        // On mobile, show the form after recording
-        if (isMobile) {
-          setIsFormVisible(true);
-        }
+        setIsFormVisible(true);
       };
       
       displayStream.getVideoTracks()[0].onended = () => {
@@ -467,9 +467,8 @@ export default function Record() {
       setIsRecording(true);
       setIsPaused(false);
       
-      // Hide the form when recording on mobile
       if (isMobile) {
-        setIsFormVisible(false);
+        requestFullscreen();
       }
       
       timerRef.current = window.setInterval(() => {
@@ -561,6 +560,7 @@ export default function Record() {
     setIsUploading(false);
     setUploadComplete(false);
     setCameraAccessError(null);
+    setIsFormVisible(false);
     
     if (videoRef.current) {
       videoRef.current.srcObject = null;
@@ -586,7 +586,6 @@ export default function Record() {
   };
   
   const saveRecording = async () => {
-    // Getting form data from RecordingForm component
     const formElement = document.getElementById("recording-form") as HTMLFormElement;
     if (!formElement) {
       toast({
@@ -737,7 +736,8 @@ export default function Record() {
     checkBrowserCompatibility();
     enumerateDevices();
     
-    // Cleanup function
+    startCamera();
+    
     return () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
@@ -759,10 +759,10 @@ export default function Record() {
   
   return (
     <div 
-      className={`container py-6 ${isRecording && isMobile ? 'max-w-full px-0' : 'max-w-6xl px-4'}`}
+      className={`container py-6 ${isRecording ? 'max-w-full px-0' : 'max-w-6xl px-4'}`}
       ref={containerRef}
     >
-      {!isRecording && !isFullscreen && (
+      {!isRecording && !recordedBlob && (
         <div className="flex items-center gap-2 mb-4">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-5 w-5" />
@@ -774,205 +774,227 @@ export default function Record() {
         </div>
       )}
       
-      {!isRecording && !isFullscreen && (
-        <RecordingBreadcrumb 
-          rehearsalId={rehearsalIdParam || undefined} 
-          className="mb-6"
-        />
+      {currentPerformance && !isRecording && !recordedBlob && (
+        <div className="mb-6">
+          <Badge variant="outline" className="text-sm">
+            For: {currentPerformance.title}
+          </Badge>
+        </div>
       )}
       
-      <div className={`grid ${isMobile || isRecording ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-3'} gap-6`}>
-        <div className={`${isMobile || isRecording ? '' : 'lg:col-span-2'} space-y-6`}>
-          <div className={`${isRecording && isMobile ? 'h-screen' : 'aspect-video'} bg-muted rounded-lg overflow-hidden relative`}>
-            {!isRecording && !recordedBlob && !cameraAccessError && !isInitializingCamera && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <Video className="h-12 w-12 text-muted-foreground/50 mb-2" />
-                <p className="text-muted-foreground font-medium">
-                  Ready to record your performance
+      <div className="relative">
+        <div 
+          className={`${isRecording || !recordedBlob ? 'aspect-video' : 'aspect-video lg:aspect-video'} 
+                     bg-muted rounded-lg overflow-hidden relative`}
+        >
+          {!isRecording && !recordedBlob && !cameraAccessError && !isInitializingCamera && !streamRef.current && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <Video className="h-12 w-12 text-muted-foreground/50 mb-2" />
+              <p className="text-muted-foreground font-medium">
+                Ready to record your performance
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Press the record button below to start
+              </p>
+            </div>
+          )}
+          
+          {isInitializingCamera && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <div className="animate-pulse flex flex-col items-center">
+                <Camera className="h-12 w-12 text-primary mb-2" />
+                <p className="text-primary font-medium">
+                  Initializing camera...
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  Press the record button below to start
+                <p className="text-sm text-muted-foreground mt-1">
+                  Please allow camera access when prompted
                 </p>
               </div>
-            )}
-            
-            {isInitializingCamera && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <div className="animate-pulse flex flex-col items-center">
-                  <Camera className="h-12 w-12 text-primary mb-2" />
-                  <p className="text-primary font-medium">
-                    Initializing camera...
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Please allow camera access when prompted
-                  </p>
-                </div>
-              </div>
-            )}
-            
-            {cameraAccessError && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-w-md">
-                  <div className="flex gap-3 items-start">
-                    <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
-                    <div>
-                      <h3 className="font-semibold text-red-900">Camera Access Error</h3>
-                      <p className="text-red-700 mt-1 text-sm">{cameraAccessError}</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <Button variant="outline" size="sm" onClick={() => setCameraAccessError(null)}>
-                          Try Again
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={attemptScreenshareWithCamera}>
-                          Try Screen Share
-                        </Button>
-                      </div>
+            </div>
+          )}
+          
+          {cameraAccessError && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-w-md">
+                <div className="flex gap-3 items-start">
+                  <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold text-red-900">Camera Access Error</h3>
+                    <p className="text-red-700 mt-1 text-sm">{cameraAccessError}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setCameraAccessError(null)}>
+                        Try Again
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={attemptScreenshareWithCamera}>
+                        Try Screen Share
+                      </Button>
                     </div>
                   </div>
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted={isRecording} // Mute only during recording to prevent feedback
-              className="w-full h-full object-cover"
-            />
-            
-            {isRecording && (
-              <div className="absolute top-4 left-4 bg-black/50 text-white px-3 py-1 rounded-full flex items-center gap-2">
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted={isRecording} // Mute only during recording to prevent feedback
+            className="w-full h-full object-cover"
+          />
+          
+          {isRecording && (
+            <div className="absolute top-4 left-0 right-0 flex justify-center items-center">
+              <div className="bg-black/50 text-white px-4 py-2 rounded-full flex items-center gap-2">
                 <div className={`h-2 w-2 rounded-full ${isPaused ? 'bg-yellow-500' : 'bg-red-500 animate-pulse'}`} />
-                <span>{formatTime(recordingTime)}</span>
-                {usingFallbackMode && <Badge variant="outline" className="ml-1 text-xs">Fallback Mode</Badge>}
+                <span className="font-mono">{formatTime(recordingTime)}</span>
               </div>
-            )}
-          </div>
-          
-          <div className="flex justify-center">
-            {!isRecording && !recordedBlob ? (
-              <button 
-                onClick={startRecording} 
-                className="record-btn"
-                aria-label="Start recording"
-                disabled={isInitializingCamera}
-              >
-                <div className="record-btn-inner" />
-              </button>
-            ) : isRecording ? (
-              <div className="flex items-center gap-4">
-                <Button
-                  size="icon"
-                  variant="outline"
-                  className="h-12 w-12 rounded-full"
-                  onClick={pauseRecording}
-                  aria-label={isPaused ? "Resume recording" : "Pause recording"}
-                >
-                  {isPaused ? (
-                    <Play className="h-6 w-6" />
-                  ) : (
-                    <Pause className="h-6 w-6" />
-                  )}
-                </Button>
-                <Button
-                  size="icon"
-                  variant="destructive"
-                  className="h-14 w-14 rounded-full"
-                  onClick={stopRecording}
-                  aria-label="Stop recording"
-                >
-                  <StopCircle className="h-8 w-8" />
-                </Button>
-              </div>
-            ) : null}
-          </div>
-          
-          {recordedBlob && !isUploading && (
-            <div className="bg-muted/40 border rounded p-3 text-sm flex items-center gap-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <span>Recording length: {formatTime(recordingTime)}</span>
-              <Badge variant="outline" className="ml-auto">{Math.round(recordedBlob.size / 1024 / 1024 * 10) / 10} MB</Badge>
-              {usingFallbackMode && (
-                <Badge variant="secondary">Fallback mode used</Badge>
-              )}
             </div>
           )}
           
-          {isUploading && (
-            <div className="bg-background border rounded-md p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">
-                  {uploadPhase === 'preparing' && 'Preparing upload...'}
-                  {uploadPhase === 'uploading' && 'Uploading to Google Drive...'}
-                  {uploadPhase === 'processing' && 'Processing video...'}
-                  {uploadPhase === 'saving' && 'Saving recording details...'}
-                  {uploadPhase === 'complete' && 'Upload complete!'}
-                  {uploadPhase === 'error' && 'Upload failed'}
-                </span>
-                <span className="text-sm text-muted-foreground">
-                  {uploadPhase === 'uploading' ? `${Math.round(uploadProgress)}%` : ''}
-                </span>
-              </div>
+          {!isRecording && !recordedBlob && streamRef.current && (
+            <div className="absolute bottom-4 right-4 flex gap-2">
+              <Button 
+                variant="secondary" 
+                size="icon"
+                className="bg-black/30 hover:bg-black/50 text-white rounded-full h-10 w-10"
+                onClick={switchCamera}
+              >
+                <FlipHorizontal className="h-5 w-5" />
+              </Button>
               
-              <Progress 
-                value={uploadPhase === 'uploading' ? uploadProgress : 
-                      uploadPhase === 'preparing' ? 10 : 
-                      uploadPhase === 'processing' ? 80 : 
-                      uploadPhase === 'saving' ? 95 : 
-                      uploadPhase === 'complete' ? 100 : 0} 
-                className="h-2" 
-              />
-              
-              {uploadError && (
-                <div className="bg-red-50 border border-red-200 rounded p-3 flex items-start gap-2 text-sm">
-                  <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="font-medium text-red-900">Upload failed</p>
-                    <p className="text-red-700">{uploadError}</p>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="mt-2" 
-                      onClick={handleRetry}
-                      disabled={retryCount >= 3}
-                    >
-                      <RefreshCw className="h-3 w-3 mr-1" />
-                      Retry Upload ({retryCount}/3)
-                    </Button>
-                  </div>
-                </div>
-              )}
+              <Button 
+                variant="secondary" 
+                size="icon"
+                className={`${flashEnabled ? 'bg-yellow-500/70 hover:bg-yellow-500/90' : 'bg-black/30 hover:bg-black/50'} text-white rounded-full h-10 w-10`}
+                onClick={toggleFlash}
+              >
+                <Zap className="h-5 w-5" />
+              </Button>
             </div>
           )}
         </div>
-        
-        {/* Form section - hidden on mobile when recording */}
-        <div className={`${(isRecording && isMobile) ? 'hidden' : ''}`}>
+      </div>
+      
+      <div className="flex justify-center my-6">
+        {!isRecording && !recordedBlob ? (
+          <button 
+            onClick={startRecording} 
+            className="record-btn"
+            aria-label="Start recording"
+            disabled={isInitializingCamera}
+          >
+            <div className="record-btn-inner" />
+          </button>
+        ) : isRecording ? (
+          <div className="flex items-center gap-4">
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-12 w-12 rounded-full"
+              onClick={pauseRecording}
+              aria-label={isPaused ? "Resume recording" : "Pause recording"}
+            >
+              {isPaused ? (
+                <Play className="h-6 w-6" />
+              ) : (
+                <Pause className="h-6 w-6" />
+              )}
+            </Button>
+            <Button
+              size="icon"
+              variant="destructive"
+              className="h-14 w-14 rounded-full"
+              onClick={stopRecording}
+              aria-label="Stop recording"
+            >
+              <StopCircle className="h-8 w-8" />
+            </Button>
+          </div>
+        ) : recordedBlob ? (
+          <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              onClick={resetRecording}
+              className="flex items-center gap-2"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Record Again
+            </Button>
+          </div>
+        ) : null}
+      </div>
+      
+      {recordedBlob && !isUploading && (
+        <div className="bg-muted/40 border rounded p-3 text-sm flex items-center gap-2">
+          <Clock className="h-4 w-4 text-muted-foreground" />
+          <span>Recording length: {formatTime(recordingTime)}</span>
+          <Badge variant="outline" className="ml-auto">{Math.round(recordedBlob.size / 1024 / 1024 * 10) / 10} MB</Badge>
+        </div>
+      )}
+      
+      {isUploading && (
+        <div className="bg-background border rounded-md p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">
+              {uploadPhase === 'preparing' && 'Preparing upload...'}
+              {uploadPhase === 'uploading' && 'Uploading to Google Drive...'}
+              {uploadPhase === 'processing' && 'Processing video...'}
+              {uploadPhase === 'saving' && 'Saving recording details...'}
+              {uploadPhase === 'complete' && 'Upload complete!'}
+              {uploadPhase === 'error' && 'Upload failed'}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              {uploadPhase === 'uploading' ? `${Math.round(uploadProgress)}%` : ''}
+            </span>
+          </div>
+          
+          <Progress 
+            value={uploadPhase === 'uploading' ? uploadProgress : 
+                  uploadPhase === 'preparing' ? 10 : 
+                  uploadPhase === 'processing' ? 80 : 
+                  uploadPhase === 'saving' ? 95 : 
+                  uploadPhase === 'complete' ? 100 : 0} 
+            className="h-2" 
+          />
+          
+          {uploadError && (
+            <div className="bg-red-50 border border-red-200 rounded p-3 flex items-start gap-2 text-sm">
+              <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium text-red-900">Upload failed</p>
+                <p className="text-red-700">{uploadError}</p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-2" 
+                  onClick={handleRetry}
+                  disabled={retryCount >= 3}
+                >
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                  Retry Upload ({retryCount}/3)
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      
+      {recordedBlob && (
+        <div className="mt-6">
           <form id="recording-form" className="space-y-4">
             <RecordingForm 
-              isVisible={isFormVisible}
+              isVisible={true}
               recordingTime={recordingTime} 
               onSaveRecording={saveRecording}
               isUploading={isUploading}
               uploadComplete={uploadComplete}
               isMobile={isMobile}
               onToggleVisibility={toggleFormVisibility}
+              rehearsalId={rehearsalIdParam || undefined}
+              performanceId={performanceIdParam || currentPerformance?.id || undefined}
             />
           </form>
-        </div>
-      </div>
-      
-      {/* Mobile form toggle */}
-      {isRecording && isMobile && !isFormVisible && (
-        <div className="fixed bottom-0 left-0 right-0 bg-background/90 backdrop-blur-sm p-3 shadow-lg rounded-t-2xl z-50">
-          <Button 
-            variant="outline" 
-            className="w-full flex justify-between items-center" 
-            onClick={toggleFormVisibility}
-          >
-            <span>Show recording options</span>
-            <ChevronUp className="h-4 w-4" />
-          </Button>
         </div>
       )}
     </div>

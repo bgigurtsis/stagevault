@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { 
   Save, 
@@ -39,6 +40,8 @@ interface RecordingFormProps {
   className?: string;
   isMobile: boolean;
   onToggleVisibility?: () => void;
+  performanceId?: string;
+  rehearsalId?: string;
 }
 
 export function RecordingForm({
@@ -49,11 +52,13 @@ export function RecordingForm({
   uploadComplete,
   className = "",
   isMobile,
-  onToggleVisibility
+  onToggleVisibility,
+  performanceId,
+  rehearsalId
 }: RecordingFormProps) {
   const [title, setTitle] = useState("");
-  const [selectedPerformance, setSelectedPerformance] = useState("");
-  const [selectedRehearsal, setSelectedRehearsal] = useState("");
+  const [selectedPerformance, setSelectedPerformance] = useState(performanceId || "");
+  const [selectedRehearsal, setSelectedRehearsal] = useState(rehearsalId || "");
   const [notes, setNotes] = useState("");
   const [tags, setTags] = useState("");
   const [performances, setPerformances] = useState<Performance[]>([]);
@@ -88,15 +93,22 @@ export function RecordingForm({
         const performanceData = await performanceService.getPerformances();
         setPerformances(performanceData);
         
-        if (performanceData.length > 0 && !selectedPerformance) {
-          const mostRecentPerformance = performanceData[0];
-          setSelectedPerformance(mostRecentPerformance.id);
+        // If we have a performance ID from props, prioritize it
+        const initialPerformanceId = performanceId || 
+          (performanceData.length > 0 && !selectedPerformance ? performanceData[0].id : null);
+        
+        if (initialPerformanceId) {
+          setSelectedPerformance(initialPerformanceId);
           
-          const rehearsalData = await rehearsalService.getRehearsalsByPerformance(mostRecentPerformance.id);
+          const rehearsalData = await rehearsalService.getRehearsalsByPerformance(initialPerformanceId);
           setAvailableRehearsals(rehearsalData);
           
-          if (rehearsalData.length > 0) {
-            setSelectedRehearsal(rehearsalData[0].id);
+          // If we have a rehearsal ID from props, prioritize it
+          const initialRehearsalId = rehearsalId || 
+            (rehearsalData.length > 0 && !selectedRehearsal ? rehearsalData[0].id : null);
+            
+          if (initialRehearsalId) {
+            setSelectedRehearsal(initialRehearsalId);
           }
         }
       } catch (error) {
@@ -110,7 +122,7 @@ export function RecordingForm({
     };
 
     fetchData();
-  }, [toast]);
+  }, [toast, performanceId, rehearsalId]);
   
   useEffect(() => {
     const updateRehearsals = async () => {
@@ -119,7 +131,8 @@ export function RecordingForm({
           const rehearsals = await rehearsalService.getRehearsalsByPerformance(selectedPerformance);
           setAvailableRehearsals(rehearsals);
           
-          if (rehearsals.length > 0 && !selectedRehearsal) {
+          // Only auto-select the first rehearsal if none is selected and we're not using a fixed rehearsal ID
+          if (rehearsals.length > 0 && !selectedRehearsal && !rehearsalId) {
             setSelectedRehearsal(rehearsals[0].id);
           }
         } catch (error) {
@@ -129,7 +142,7 @@ export function RecordingForm({
     };
 
     updateRehearsals();
-  }, [selectedPerformance, selectedRehearsal]);
+  }, [selectedPerformance, selectedRehearsal, rehearsalId]);
   
   const handleCreatePerformance = async () => {
     if (!newPerformanceTitle.trim()) {

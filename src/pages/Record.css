@@ -76,3 +76,53 @@
   background-color: #10b981;
   color: white;
 }
+
+/* Recording Timer Animation */
+@keyframes pulse-recording {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.recording-indicator {
+  animation: pulse-recording 2s infinite;
+}
+
+/* Camera Controls */
+.camera-controls {
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.camera-control-btn {
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+  border-radius: 9999px;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  transition: all 0.2s;
+}
+
+.camera-control-btn:hover {
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+.camera-control-btn.active {
+  background-color: rgba(220, 38, 38, 0.7);
+}
