@@ -154,7 +154,7 @@ export default function Dashboard() {
         <div>
           <h1 className="text-3xl font-bold">Welcome back, {currentUser?.name?.split(' ')[0] || 'User'}</h1>
           <p className="text-muted-foreground mt-1">
-            Manage your dance performances, rehearsals, and recordings
+            Manage your performances, rehearsals, and recordings
           </p>
         </div>
         <div className="flex gap-2">
