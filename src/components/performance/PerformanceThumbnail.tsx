@@ -1,7 +1,6 @@
 
 import React from 'react';
 import GeoPattern from 'geopattern';
-import { Theater } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface PerformanceThumbnailProps {
@@ -13,7 +12,7 @@ interface PerformanceThumbnailProps {
 export const PerformanceThumbnail: React.FC<PerformanceThumbnailProps> = ({ 
   title, 
   className = "",
-  fallbackIcon = true 
+  fallbackIcon = false // Changed default to false
 }) => {
   // Generate pattern based on the performance title
   const pattern = GeoPattern.generate(title, {
@@ -35,10 +34,6 @@ export const PerformanceThumbnail: React.FC<PerformanceThumbnailProps> = ({
           backgroundSize: 'cover'
         }}
       />
-      
-      {fallbackIcon && (
-        <Theater className="h-12 w-12 text-muted-foreground/50 absolute" />
-      )}
     </div>
   );
 };
