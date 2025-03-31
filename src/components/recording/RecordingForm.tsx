@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { 
   Save, 
@@ -67,7 +66,6 @@ export function RecordingForm({
   
   const { toast } = useToast();
   
-  // Generate a default title based on current date/time
   useEffect(() => {
     if (!title) {
       const now = new Date();
@@ -91,15 +89,12 @@ export function RecordingForm({
         setPerformances(performanceData);
         
         if (performanceData.length > 0 && !selectedPerformance) {
-          // Select the most recent performance by default
           const mostRecentPerformance = performanceData[0];
           setSelectedPerformance(mostRecentPerformance.id);
           
-          // Fetch and set rehearsals for this performance
           const rehearsalData = await rehearsalService.getRehearsalsByPerformance(mostRecentPerformance.id);
           setAvailableRehearsals(rehearsalData);
           
-          // Select the most recent rehearsal by default
           if (rehearsalData.length > 0) {
             setSelectedRehearsal(rehearsalData[0].id);
           }
@@ -150,6 +145,7 @@ export function RecordingForm({
       const newPerformance = await performanceService.createPerformance({
         title: newPerformanceTitle,
         startDate: new Date().toISOString().split('T')[0],
+        createdBy: "current-user"
       });
       
       toast({
