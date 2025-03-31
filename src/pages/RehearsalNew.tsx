@@ -78,7 +78,7 @@ export default function RehearsalNew() {
       </div>
 
       {!isDriveConnected && (
-        <Alert variant="warning" className="bg-amber-50 border-amber-200">
+        <Alert variant="destructive" className="bg-amber-50 border-amber-200">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Google Drive not connected</AlertTitle>
           <AlertDescription>

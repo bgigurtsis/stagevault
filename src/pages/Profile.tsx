@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, User, Drive, Check, AlertCircle } from "lucide-react";
+import { ArrowLeft, User, Check, AlertCircle, HardDrive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -97,7 +97,7 @@ export default function Profile() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Drive className="h-5 w-5" />
+            <HardDrive className="h-5 w-5" />
             Google Drive Connection
           </CardTitle>
           <CardDescription>
