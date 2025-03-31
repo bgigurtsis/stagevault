@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { 
@@ -285,12 +284,17 @@ export default function Record() {
       
       const newFlashState = !flashEnabled;
       
-      // Use advanced constraints with the torch property only if supported
+      // The correct way to apply torch constraints
+      // TypeScript doesn't recognize 'torch' as a standard property on MediaTrackConstraintSet
+      // So we need to use a type assertion to apply it
+      const constraints: MediaTrackConstraintSet = {};
+      if ('torch' in capabilities) {
+        // Use type assertion to avoid TypeScript error
+        (constraints as any).torch = newFlashState;
+      }
+      
       await videoTrack.applyConstraints({
-        advanced: [{ 
-          // Add the torch property only if it's supported
-          ...(('torch' in capabilities) && { torch: newFlashState })
-        }]
+        advanced: [constraints]
       });
       
       setFlashEnabled(newFlashState);
