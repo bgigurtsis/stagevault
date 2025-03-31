@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Link, Outlet, useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuthContext";
-import { Home, User, LogOut, Menu, X, Plus, Theater } from "lucide-react";
+import { Home, User, LogOut, Menu, X, Plus, Theater, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+
 export default function Layout() {
   const {
     currentUser,
@@ -14,6 +15,7 @@ export default function Layout() {
   } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
+  
   if (isLoading) {
     return <div className="flex min-h-screen items-center justify-center">
         <div className="space-y-4 w-full max-w-md p-6">
@@ -24,39 +26,46 @@ export default function Layout() {
         </div>
       </div>;
   }
+  
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{
       from: location
     }} replace />;
   }
+  
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
-  // Navigation items - removed Rehearsals and Recordings
-  const navItems = [{
-    path: "/",
-    icon: <Home className="h-5 w-5" />,
-    label: "Dashboard"
-  }, {
-    path: "/performances",
-    icon: <Theater className="h-5 w-5" />,
-    label: "Performances"
-  }, {
-    path: "/profile",
-    icon: <User className="h-5 w-5" />,
-    label: "Profile"
-  }];
+  const navItems = [
+    {
+      path: "/",
+      icon: <Home className="h-5 w-5" />,
+      label: "Dashboard"
+    },
+    {
+      path: "/performances",
+      icon: <Theater className="h-5 w-5" />,
+      label: "Performances"
+    },
+    {
+      path: "/profile",
+      icon: <User className="h-5 w-5" />,
+      label: "Profile"
+    }
+  ];
+
   const isLinkActive = (path: string) => {
     if (path === "/" && location.pathname === "/") return true;
     if (path !== "/" && location.pathname.startsWith(path)) return true;
     return false;
   };
+
   const handleLogout = () => {
     logout();
   };
+
   return <div className="flex h-screen overflow-hidden bg-background">
-      {/* Sidebar for desktop */}
       <aside className="hidden md:flex md:w-64 flex-col bg-sidebar border-r">
         <div className="flex h-16 items-center px-4 border-b">
           <Link to="/" className="flex items-center gap-2">
@@ -97,7 +106,6 @@ export default function Layout() {
         </div>
       </aside>
       
-      {/* Mobile header */}
       <div className="flex flex-col w-full overflow-hidden">
         <header className="flex md:hidden h-16 items-center justify-between border-b px-4">
           <Button variant="ghost" size="icon" onClick={toggleMobileMenu}>
@@ -117,8 +125,8 @@ export default function Layout() {
           </Avatar>
         </header>
         
-        {/* Mobile menu overlay */}
-        {isMobileMenuOpen && <div className="fixed inset-0 z-50 md:hidden bg-background/80 backdrop-blur-sm">
+        {isMobileMenuOpen && (
+          <div className="fixed inset-0 z-50 md:hidden bg-background/80 backdrop-blur-sm">
             <div className="fixed inset-y-0 left-0 w-3/4 max-w-sm bg-background shadow-lg">
               <div className="flex h-16 items-center justify-between border-b px-4">
                 <Link to="/" className="flex items-center gap-2">
@@ -169,21 +177,27 @@ export default function Layout() {
             </div>
             
             <div className="fixed inset-0 z-[-1]" onClick={toggleMobileMenu} aria-hidden="true" />
-          </div>}
+          </div>
+        )}
         
-        {/* Main content area */}
         <main className="flex-1 overflow-auto">
           <Outlet />
         </main>
         
-        {/* Floating action button for mobile */}
-        {location.pathname !== "/record" && <div className="fixed right-4 bottom-4 md:right-8 md:bottom-8 z-10">
+        {location.pathname !== "/record" && (
+          <div className="fixed right-4 bottom-16 md:right-8 md:bottom-8 z-50">
             <Link to="/record">
-              
+              <Button 
+                size="icon" 
+                className="h-14 w-14 rounded-full shadow-lg bg-red-500 hover:bg-red-600 text-white"
+                aria-label="Record video"
+              >
+                <Video className="h-6 w-6" />
+              </Button>
             </Link>
-          </div>}
+          </div>
+        )}
         
-        {/* Mobile bottom navigation */}
         <nav className="md:hidden border-t bg-background">
           <div className="flex justify-between">
             {navItems.map(item => <Link key={item.path} to={item.path} className={`flex flex-1 flex-col items-center py-2 px-1 ${isLinkActive(item.path) ? "text-primary" : "text-muted-foreground"}`}>

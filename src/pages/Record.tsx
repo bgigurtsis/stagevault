@@ -7,94 +7,138 @@ import {
   Pause, 
   Play, 
   StopCircle, 
-  Save,
   ArrowLeft,
-  Upload,
-  Check,
   Clock,
   AlertCircle,
   Camera,
   RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
 import { useToast } from "@/hooks/use-toast";
-import { performanceService } from "@/services/performanceService";
-import { rehearsalService } from "@/services/rehearsalService";
 import { recordingService } from "@/services/recordingService";
 import { googleDriveService } from "@/services/googleDriveService";
-import { Performance, Rehearsal } from "@/types";
+import { RecordingForm } from "@/components/recording/RecordingForm";
+import { RecordingBreadcrumb } from "@/components/recording/RecordingBreadcrumb";
 import "./Record.css";
 
 export default function Record() {
-  const [title, setTitle] = useState("");
-  const [selectedPerformance, setSelectedPerformance] = useState("");
-  const [selectedRehearsal, setSelectedRehearsal] = useState("");
-  const [notes, setNotes] = useState("");
-  const [tags, setTags] = useState("");
+  // Recording state
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [performances, setPerformances] = useState<Performance[]>([]);
-  const [availableRehearsals, setAvailableRehearsals] = useState<Rehearsal[]>([]);
+  
+  // UI state
+  const [isFormVisible, setIsFormVisible] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  
+  // Camera state
+  const [isInitializingCamera, setIsInitializingCamera] = useState(false);
+  const [cameraAccessError, setCameraAccessError] = useState<string | null>(null);
+  const [selectedCameraId, setSelectedCameraId] = useState<string>("");
+  const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
+  const [usingFallbackMode, setUsingFallbackMode] = useState(false);
+  
+  // Upload state
   const [isLoading, setIsLoading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadComplete, setUploadComplete] = useState(false);
   const [uploadPhase, setUploadPhase] = useState<'preparing' | 'uploading' | 'processing' | 'saving' | 'complete' | 'error'>('preparing');
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const [cameraAccessError, setCameraAccessError] = useState<string | null>(null);
-  const [isInitializingCamera, setIsInitializingCamera] = useState(false);
-  const [cameraAccessTimeout, setCameraAccessTimeout] = useState(10000);
-  const [usingFallbackMode, setUsingFallbackMode] = useState(false);
-  const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
-  const [selectedCameraId, setSelectedCameraId] = useState<string>("");
   
+  // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const rehearsalIdParam = searchParams.get('rehearsalId');
   const { toast } = useToast();
   
+  // Detect mobile devices
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    handleResize();
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+  
+  // Handle orientation changes
+  useEffect(() => {
+    const handleOrientationChange = () => {
+      if (isRecording && window.matchMedia("(orientation: landscape)").matches) {
+        // Try to enter fullscreen when recording in landscape
+        requestFullscreen();
+      }
+    };
+    
+    window.addEventListener('orientationchange', handleOrientationChange);
+    
+    return () => {
+      window.removeEventListener('orientationchange', handleOrientationChange);
+    };
+  }, [isRecording]);
+  
+  // Handle fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+  
+  // Function to request fullscreen
+  const requestFullscreen = () => {
+    if (containerRef.current && !document.fullscreenElement) {
+      containerRef.current.requestFullscreen().catch(err => {
+        console.log(`Error attempting to enable fullscreen: ${err.message}`);
+      });
+    }
+  };
+  
+  // Function to exit fullscreen
+  const exitFullscreen = () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(err => {
+        console.log(`Error attempting to exit fullscreen: ${err.message}`);
+      });
+    }
+  };
+  
+  // Toggle form visibility (for mobile)
+  const toggleFormVisibility = () => {
+    setIsFormVisible(!isFormVisible);
+  };
+  
+  // Debug logging
   const logDebug = (message: string, data?: any) => {
     const timestamp = new Date().toISOString();
     const logMessage = `${timestamp} - ${message}`;
     console.log(logMessage, data);
   };
   
+  // Camera access functions
   const enumerateDevices = async () => {
     try {
       logDebug("Enumerating devices");
@@ -161,6 +205,7 @@ export default function Record() {
     return browserName;
   };
   
+  // Recording functions
   const startRecording = async () => {
     try {
       setCameraAccessError(null);
@@ -170,9 +215,9 @@ export default function Record() {
       
       const timeoutPromise = new Promise<MediaStream>((_, reject) => {
         setTimeout(() => {
-          logDebug("Camera access timeout reached", { timeout: cameraAccessTimeout });
+          logDebug("Camera access timeout reached");
           reject(new Error("Camera access timeout - please check your browser settings"));
-        }, cameraAccessTimeout);
+        }, 10000);
       });
       
       await enumerateDevices();
@@ -181,25 +226,7 @@ export default function Record() {
       
       const stream = await Promise.race([accessPromise, timeoutPromise]);
       
-      const videoTrack = stream.getVideoTracks()[0];
-      const audioTrack = stream.getAudioTracks()[0];
-      
-      const trackInfo = {
-        videoTrack: videoTrack ? {
-          label: videoTrack.label,
-          settings: videoTrack.getSettings(),
-          constraints: videoTrack.getConstraints(),
-          capabilities: videoTrack.getCapabilities ? videoTrack.getCapabilities() : 'Not supported'
-        } : null,
-        audioTrack: audioTrack ? {
-          label: audioTrack.label,
-          settings: audioTrack.getSettings(),
-          constraints: audioTrack.getConstraints(),
-          capabilities: audioTrack.getCapabilities ? audioTrack.getCapabilities() : 'Not supported'
-        } : null
-      };
-      
-      logDebug("Camera access granted successfully", trackInfo);
+      logDebug("Camera access granted successfully");
       setIsInitializingCamera(false);
       streamRef.current = stream;
       
@@ -231,7 +258,7 @@ export default function Record() {
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
           chunksRef.current.push(e.data);
-          logDebug("Received data chunk", { size: e.data.size, timestamp: new Date().toISOString() });
+          logDebug("Received data chunk", { size: e.data.size });
         }
       };
       
@@ -247,12 +274,30 @@ export default function Record() {
           videoRef.current.src = url;
           videoRef.current.controls = true;
         }
+        
+        // On mobile, show the form after recording
+        if (isMobile) {
+          setIsFormVisible(true);
+        }
+        
+        // Exit fullscreen when recording ends
+        exitFullscreen();
       };
       
       mediaRecorder.start(1000);
       logDebug("Media recorder started");
       setIsRecording(true);
       setIsPaused(false);
+      
+      // Hide the form when recording on mobile
+      if (isMobile) {
+        setIsFormVisible(false);
+        
+        // Enter fullscreen when recording on mobile
+        if (window.matchMedia("(orientation: landscape)").matches) {
+          requestFullscreen();
+        }
+      }
       
       timerRef.current = window.setInterval(() => {
         setRecordingTime(prev => prev + 1);
@@ -267,8 +312,7 @@ export default function Record() {
       if (error instanceof Error) {
         logDebug("Camera access error details", { 
           message: error.message, 
-          name: error.name, 
-          stack: error.stack 
+          name: error.name
         });
         
         if (error.name === "NotAllowedError" || error.message.includes("Permission denied")) {
@@ -405,6 +449,11 @@ export default function Record() {
           videoRef.current.src = url;
           videoRef.current.controls = true;
         }
+        
+        // On mobile, show the form after recording
+        if (isMobile) {
+          setIsFormVisible(true);
+        }
       };
       
       displayStream.getVideoTracks()[0].onended = () => {
@@ -415,6 +464,11 @@ export default function Record() {
       logDebug("Screen recorder started");
       setIsRecording(true);
       setIsPaused(false);
+      
+      // Hide the form when recording on mobile
+      if (isMobile) {
+        setIsFormVisible(false);
+      }
       
       timerRef.current = window.setInterval(() => {
         setRecordingTime(prev => prev + 1);
@@ -530,6 +584,23 @@ export default function Record() {
   };
   
   const saveRecording = async () => {
+    // Getting form data from RecordingForm component
+    const formElement = document.getElementById("recording-form") as HTMLFormElement;
+    if (!formElement) {
+      toast({
+        title: "Form error",
+        description: "Could not access the form data. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const formData = new FormData(formElement);
+    const title = formData.get("title") as string;
+    const selectedRehearsal = formData.get("rehearsal") as string;
+    const notes = formData.get("notes") as string;
+    const tags = formData.get("tags") as string;
+    
     if (!title) {
       toast({
         title: "Title required",
@@ -563,33 +634,22 @@ export default function Record() {
     setUploadError(null);
     
     try {
-      const rehearsal = availableRehearsals.find(r => r.id === selectedRehearsal);
-      if (!rehearsal) throw new Error("Rehearsal not found");
-      
-      const performance = performances.find(p => p.id === rehearsal.performanceId);
-      if (!performance) throw new Error("Performance not found");
-      
       const fileExtension = "webm";
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
       const fileName = `${title.replace(/[^a-z0-9]/gi, "_")}_${timestamp}.${fileExtension}`;
       
       setUploadPhase('uploading');
       
-      logDebug("Uploading video to Google Drive", {
-        rehearsalTitle: rehearsal.title,
-        performanceTitle: performance.title,
-        driveFolderId: rehearsal.driveFolderId || "Not set"
-      });
+      logDebug("Uploading video to Google Drive");
       
       const driveFile = await googleDriveService.uploadVideo(
         recordedBlob,
         fileName,
-        performance.title,
-        rehearsal.title,
+        "Performance", // Will be updated with the actual performance title when saving to the database
+        "Rehearsal",   // Will be updated with the actual rehearsal title when saving to the database
         (progress) => {
           setUploadProgress(progress);
-        },
-        rehearsal.driveFolderId
+        }
       );
       
       if (!driveFile) {
@@ -602,7 +662,7 @@ export default function Record() {
       
       setUploadPhase('saving');
       
-      const tagsArray = tags.split(',').map(tag => tag.trim()).filter(tag => tag !== '');
+      const tagsArray = tags ? tags.split(',').map(tag => tag.trim()).filter(tag => tag !== '') : [];
       
       await recordingService.createRecording({
         rehearsalId: selectedRehearsal,
@@ -664,7 +724,7 @@ export default function Record() {
     return (
       <div className="upload-phase">
         <div className={`upload-phase-indicator ${isActive ? 'active' : ''} ${isComplete ? 'complete' : ''}`}>
-          {isComplete ? <Check className="h-3 w-3" /> : icon}
+          {icon}
         </div>
         <span>{phaseLabel}</span>
       </div>
@@ -675,63 +735,7 @@ export default function Record() {
     checkBrowserCompatibility();
     enumerateDevices();
     
-    const fetchData = async () => {
-      try {
-        const performanceData = await performanceService.getPerformances();
-        setPerformances(performanceData);
-        
-        if (!rehearsalIdParam) {
-          const rehearsalData = await rehearsalService.getAllRehearsals();
-          setAvailableRehearsals(rehearsalData);
-        } else {
-          const rehearsal = await rehearsalService.getRehearsalById(rehearsalIdParam);
-          if (rehearsal) {
-            setSelectedRehearsal(rehearsal.id);
-            setSelectedPerformance(rehearsal.performanceId);
-            const filteredRehearsals = await rehearsalService.getRehearsalsByPerformance(rehearsal.performanceId);
-            setAvailableRehearsals(filteredRehearsals);
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        logDebug("Error fetching data", error);
-        toast({
-          title: "Error",
-          description: "Failed to load performances and rehearsals. Please try again.",
-          variant: "destructive",
-        });
-      }
-    };
-
-    fetchData();
-  }, [rehearsalIdParam, toast]);
-  
-  useEffect(() => {
-    const updateRehearsals = async () => {
-      if (selectedPerformance) {
-        try {
-          const rehearsals = await rehearsalService.getRehearsalsByPerformance(selectedPerformance);
-          setAvailableRehearsals(rehearsals);
-          
-          if (rehearsals.length > 0 && !selectedRehearsal) {
-            setSelectedRehearsal(rehearsals[0].id);
-          }
-        } catch (error) {
-          console.error("Error fetching rehearsals for performance:", error);
-          logDebug("Error fetching rehearsals for performance", error);
-          toast({
-            title: "Error",
-            description: "Failed to load rehearsals for this performance.",
-            variant: "destructive",
-          });
-        }
-      }
-    };
-
-    updateRehearsals();
-  }, [selectedPerformance, selectedRehearsal, toast]);
-  
-  useEffect(() => {
+    // Cleanup function
     return () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
@@ -743,7 +747,7 @@ export default function Record() {
         URL.revokeObjectURL(videoUrl);
       }
     };
-  }, [videoUrl]);
+  }, []);
   
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -752,9 +756,12 @@ export default function Record() {
   };
   
   return (
-    <div className="container max-w-6xl py-6 space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between gap-4">
-        <div className="flex items-center gap-2">
+    <div 
+      className={`container py-6 ${isRecording && isMobile ? 'max-w-full px-0' : 'max-w-6xl px-4'}`}
+      ref={containerRef}
+    >
+      {!isRecording && !isFullscreen && (
+        <div className="flex items-center gap-2 mb-4">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
@@ -763,124 +770,18 @@ export default function Record() {
             <span>Record Video</span>
           </h1>
         </div>
-        <div className="flex gap-2">
-          {recordedBlob && (
-            <>
-              <Button variant="outline" onClick={resetRecording} disabled={isUploading}>
-                <X className="mr-2 h-4 w-4" />
-                Reset
-              </Button>
-              <Button 
-                onClick={saveRecording} 
-                disabled={isLoading || isUploading}
-                className={uploadComplete ? "bg-green-600 hover:bg-green-700" : ""}
-              >
-                {uploadComplete ? (
-                  <>
-                    <Check className="mr-2 h-4 w-4" />
-                    Saved
-                  </>
-                ) : isUploading ? (
-                  <>
-                    <Upload className="mr-2 h-4 w-4 animate-pulse" />
-                    Uploading...
-                  </>
-                ) : (
-                  <>
-                    <Save className="mr-2 h-4 w-4" />
-                    Save Recording
-                  </>
-                )}
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-      
-      {isUploading && (
-        <div className="bg-background border rounded-md p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">
-              {uploadPhase === 'preparing' && 'Preparing upload...'}
-              {uploadPhase === 'uploading' && 'Uploading to Google Drive...'}
-              {uploadPhase === 'processing' && 'Processing video...'}
-              {uploadPhase === 'saving' && 'Saving recording details...'}
-              {uploadPhase === 'complete' && 'Upload complete!'}
-              {uploadPhase === 'error' && 'Upload failed'}
-            </span>
-            <span className="text-sm text-muted-foreground">
-              {uploadPhase === 'uploading' ? `${Math.round(uploadProgress)}%` : ''}
-            </span>
-          </div>
-          
-          <Progress 
-            value={uploadPhase === 'uploading' ? uploadProgress : 
-                  uploadPhase === 'preparing' ? 10 : 
-                  uploadPhase === 'processing' ? 80 : 
-                  uploadPhase === 'saving' ? 95 : 
-                  uploadPhase === 'complete' ? 100 : 0} 
-            className="h-2" 
-          />
-          
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <UploadPhaseIndicator 
-              currentPhase={uploadPhase} 
-              phaseName="preparing" 
-              phaseLabel="Prepare" 
-              icon={<Clock className="h-3 w-3" />} 
-            />
-            <UploadPhaseIndicator 
-              currentPhase={uploadPhase} 
-              phaseName="uploading" 
-              phaseLabel="Upload" 
-              icon={<Upload className="h-3 w-3" />} 
-            />
-            <UploadPhaseIndicator 
-              currentPhase={uploadPhase} 
-              phaseName="processing" 
-              phaseLabel="Process" 
-              icon={<Video className="h-3 w-3" />} 
-            />
-            <UploadPhaseIndicator 
-              currentPhase={uploadPhase} 
-              phaseName="saving" 
-              phaseLabel="Save" 
-              icon={<Save className="h-3 w-3" />} 
-            />
-          </div>
-          
-          {uploadError && (
-            <div className="bg-red-50 border border-red-200 rounded p-3 flex items-start gap-2 text-sm">
-              <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="font-medium text-red-900">Upload failed</p>
-                <p className="text-red-700">{uploadError}</p>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="mt-2" 
-                  onClick={handleRetry}
-                  disabled={retryCount >= 3}
-                >
-                  Retry Upload ({retryCount}/3)
-                </Button>
-              </div>
-            </div>
-          )}
-          
-          <p className="text-xs text-muted-foreground">
-            {uploadPhase === 'complete' ? 
-              "Upload complete! Redirecting to rehearsal page..." : 
-              uploadPhase === 'error' ?
-              "There was an error uploading your video. Please try again." :
-              "Please do not close this page while the video is uploading."}
-          </p>
-        </div>
       )}
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-muted rounded-lg overflow-hidden relative aspect-video">
+      {!isRecording && !isFullscreen && (
+        <RecordingBreadcrumb 
+          rehearsalId={rehearsalIdParam || undefined} 
+          className="mb-6"
+        />
+      )}
+      
+      <div className={`grid ${isMobile || isRecording ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-3'} gap-6`}>
+        <div className={`${isMobile || isRecording ? '' : 'lg:col-span-2'} space-y-6`}>
+          <div className={`${isRecording && isMobile ? 'h-screen' : 'aspect-video'} bg-muted rounded-lg overflow-hidden relative`}>
             {!isRecording && !recordedBlob && !cameraAccessError && !isInitializingCamera && (
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <Video className="h-12 w-12 text-muted-foreground/50 mb-2" />
@@ -890,27 +791,6 @@ export default function Record() {
                 <p className="text-sm text-muted-foreground">
                   Press the record button below to start
                 </p>
-                
-                {availableCameras.length > 0 && (
-                  <div className="mt-4">
-                    <Select
-                      value={selectedCameraId}
-                      onValueChange={setSelectedCameraId}
-                    >
-                      <SelectTrigger className="w-[250px]">
-                        <SelectValue placeholder="Select a camera" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableCameras.map((camera) => (
-                          <SelectItem key={camera.deviceId || camera.groupId} 
-                                      value={camera.deviceId || camera.groupId || `camera-${camera.groupId}`}>
-                            {camera.label || `Camera ${camera.deviceId ? camera.deviceId.substring(0, 5) : "Default"}`}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
               </div>
             )}
             
@@ -940,18 +820,9 @@ export default function Record() {
                         <Button variant="outline" size="sm" onClick={() => setCameraAccessError(null)}>
                           Try Again
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => {
-                          setCameraAccessTimeout(cameraAccessTimeout + 5000);
-                          setCameraAccessError(null);
-                        }}>
-                          Increase Timeout (+5s)
-                        </Button>
                         <Button variant="outline" size="sm" onClick={attemptScreenshareWithCamera}>
                           Try Screen Share
                         </Button>
-                        <p className="text-xs text-muted-foreground mt-1 w-full">
-                          Make sure your camera is connected and you've allowed browser permissions
-                        </p>
                       </div>
                     </div>
                   </div>
@@ -1024,103 +895,84 @@ export default function Record() {
               )}
             </div>
           )}
-        </div>
-        
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="title">Recording Title *</Label>
-            <Input
-              id="title"
-              placeholder="Enter a title for this recording"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-            />
-          </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="performance">Performance</Label>
-            <Select
-              value={selectedPerformance}
-              onValueChange={setSelectedPerformance}
-              disabled={!!rehearsalIdParam || isUploading}
-            >
-              <SelectTrigger id="performance">
-                <SelectValue placeholder="Select a performance" />
-              </SelectTrigger>
-              <SelectContent>
-                {performances.map((performance) => (
-                  <SelectItem key={performance.id} value={performance.id}>
-                    {performance.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="rehearsal">Rehearsal *</Label>
-            <Select
-              value={selectedRehearsal}
-              onValueChange={setSelectedRehearsal}
-              disabled={!!rehearsalIdParam || isUploading}
-            >
-              <SelectTrigger id="rehearsal">
-                <SelectValue placeholder="Select a rehearsal" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableRehearsals.map((rehearsal) => (
-                  <SelectItem key={rehearsal.id} value={rehearsal.id}>
-                    {rehearsal.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea
-              id="notes"
-              placeholder="Add notes about this recording"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={4}
-              disabled={isUploading}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="tags">Tags</Label>
-            <Input
-              id="tags"
-              placeholder="Add tags separated by commas"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              disabled={isUploading}
-            />
-            <p className="text-xs text-muted-foreground">
-              E.g., solo, group, needs work
-            </p>
-          </div>
-          
-          {recordedBlob && !isUploading && (
-            <div className="mt-4">
-              <Button 
-                onClick={saveRecording} 
-                className="w-full" 
-                disabled={isLoading || !title || !selectedRehearsal}
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                Upload to Google Drive
-              </Button>
-              <p className="text-xs text-muted-foreground mt-2 text-center">
-                Your video will be securely stored in your Google Drive account
-              </p>
+          {isUploading && (
+            <div className="bg-background border rounded-md p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">
+                  {uploadPhase === 'preparing' && 'Preparing upload...'}
+                  {uploadPhase === 'uploading' && 'Uploading to Google Drive...'}
+                  {uploadPhase === 'processing' && 'Processing video...'}
+                  {uploadPhase === 'saving' && 'Saving recording details...'}
+                  {uploadPhase === 'complete' && 'Upload complete!'}
+                  {uploadPhase === 'error' && 'Upload failed'}
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  {uploadPhase === 'uploading' ? `${Math.round(uploadProgress)}%` : ''}
+                </span>
+              </div>
+              
+              <Progress 
+                value={uploadPhase === 'uploading' ? uploadProgress : 
+                      uploadPhase === 'preparing' ? 10 : 
+                      uploadPhase === 'processing' ? 80 : 
+                      uploadPhase === 'saving' ? 95 : 
+                      uploadPhase === 'complete' ? 100 : 0} 
+                className="h-2" 
+              />
+              
+              {uploadError && (
+                <div className="bg-red-50 border border-red-200 rounded p-3 flex items-start gap-2 text-sm">
+                  <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-red-900">Upload failed</p>
+                    <p className="text-red-700">{uploadError}</p>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="mt-2" 
+                      onClick={handleRetry}
+                      disabled={retryCount >= 3}
+                    >
+                      <RefreshCw className="h-3 w-3 mr-1" />
+                      Retry Upload ({retryCount}/3)
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
+        
+        {/* Form section - hidden on mobile when recording */}
+        <div className={`${(isRecording && isMobile) ? 'hidden' : ''}`}>
+          <form id="recording-form" className="space-y-4">
+            <RecordingForm 
+              isVisible={isFormVisible}
+              recordingTime={recordingTime} 
+              onSaveRecording={saveRecording}
+              isUploading={isUploading}
+              uploadComplete={uploadComplete}
+              isMobile={isMobile}
+              onToggleVisibility={toggleFormVisibility}
+            />
+          </form>
+        </div>
       </div>
+      
+      {/* Mobile form toggle */}
+      {isRecording && isMobile && !isFormVisible && (
+        <div className="fixed bottom-0 left-0 right-0 bg-background/90 backdrop-blur-sm p-3 shadow-lg rounded-t-2xl z-50">
+          <Button 
+            variant="outline" 
+            className="w-full flex justify-between items-center" 
+            onClick={toggleFormVisibility}
+          >
+            <span>Show recording options</span>
+            <ChevronUp className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
