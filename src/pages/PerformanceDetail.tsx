@@ -1,12 +1,9 @@
-
 import { useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { 
   Theater, 
   Calendar, 
-  Clock,
-  MapPin,
   Users,
   Plus,
   PlayCircle,
@@ -14,7 +11,6 @@ import {
   Edit,
   Trash,
   MoreVertical,
-  Flag,
   Loader2
 } from "lucide-react";
 
@@ -47,6 +43,8 @@ import { useAuth } from "@/hooks/useAuthContext";
 import { performanceService } from "@/services/performanceService";
 import { rehearsalService } from "@/services/rehearsalService";
 import { Performance, Rehearsal } from "@/types";
+import RehearsalCard from "@/components/RehearsalCard";
+import { MapPin } from "lucide-react";
 
 export default function PerformanceDetail() {
   const { performanceId } = useParams<{ performanceId: string }>();
@@ -161,6 +159,9 @@ export default function PerformanceDetail() {
     if (!a.date || !b.date) return 0;
     return new Date(b.date).getTime() - new Date(a.date).getTime();
   });
+
+  // Get the most recent rehearsal (if any)
+  const latestRehearsal = sortedRehearsals.length > 0 ? sortedRehearsals[0] : undefined;
 
   if (isLoadingPerformance) {
     return (
@@ -354,62 +355,15 @@ export default function PerformanceDetail() {
                 </CardContent>
               </Card>
               
-              {/* Recent Rehearsals Preview */}
-              {sortedRehearsals.length > 0 && (
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <h2 className="text-xl font-semibold">Recent Rehearsals</h2>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => setActiveTab("rehearsals")}
-                    >
-                      View All
-                    </Button>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {sortedRehearsals.slice(0, 3).map((rehearsal) => (
-                        <Link 
-                          key={rehearsal.id} 
-                          to={`/rehearsals/${rehearsal.id}`} 
-                          className="block"
-                        >
-                          <div className="flex items-start p-3 rounded-lg hover:bg-muted">
-                            <div className="flex-1">
-                              <h3 className="font-medium">{rehearsal.title}</h3>
-                              <div className="flex items-center text-sm text-muted-foreground mt-1">
-                                <Calendar className="h-3.5 w-3.5 mr-1" />
-                                <span>{new Date(rehearsal.date).toLocaleDateString()}</span>
-                                {rehearsal.location && (
-                                  <>
-                                    <span className="mx-1">•</span>
-                                    <MapPin className="h-3.5 w-3.5 mr-1" />
-                                    <span>{rehearsal.location}</span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                            <Button variant="ghost" size="icon" className="h-7 w-7">
-                              <PlayCircle className="h-5 w-5" />
-                            </Button>
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  </CardContent>
-                  {sortedRehearsals.length > 3 && (
-                    <CardFooter>
-                      <Button 
-                        variant="outline" 
-                        className="w-full"
-                        onClick={() => setActiveTab("rehearsals")}
-                      >
-                        View All {sortedRehearsals.length} Rehearsals
-                      </Button>
-                    </CardFooter>
-                  )}
-                </Card>
+              {/* Always show the Rehearsal Card */}
+              {!isLoadingRehearsals && (
+                <RehearsalCard
+                  rehearsal={latestRehearsal}
+                  performanceId={performance.id}
+                  onViewAllClick={() => setActiveTab("rehearsals")}
+                  getUserById={getUserById}
+                  rehearsalsCount={sortedRehearsals.length}
+                />
               )}
             </TabsContent>
             
