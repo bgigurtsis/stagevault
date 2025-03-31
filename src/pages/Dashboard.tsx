@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Theater, ArrowRight, Clock, Plus, Calendar, Search } from "lucide-react";
+import { Theater, ArrowRight, Clock, Plus, Calendar, Search, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,13 @@ import { performanceService } from "@/services/performanceService";
 import { recordingService } from "@/services/recordingService";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 export default function Dashboard() {
   const {
     currentUser
@@ -21,6 +28,7 @@ export default function Dashboard() {
   const [performances, setPerformances] = useState<Performance[]>([]);
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       setIsLoading(true);
@@ -47,20 +55,24 @@ export default function Dashboard() {
     };
     fetchDashboardData();
   }, [toast]);
+
   const recentPerformances = performances.slice(0, 3);
   const recentRecordings = recordings.slice(0, 3);
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric"
     });
   };
+
   const formatTime = (seconds: number | undefined) => {
     if (!seconds) return "00:00";
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
+
   if (isLoading) {
     return <div className="container max-w-6xl py-6 space-y-8">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -97,6 +109,7 @@ export default function Dashboard() {
         </div>
       </div>;
   }
+
   return <div className="container max-w-6xl py-6 space-y-8">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -109,12 +122,28 @@ export default function Dashboard() {
           <Link to="/performances">
             <Button variant="outline">View Performances</Button>
           </Link>
-          <Link to="/record">
-            <Button>
-              <Search className="mr-2 h-4 w-4" />
-              Record Video
-            </Button>
-          </Link>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                New
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link to="/performances/new" className="flex items-center">
+                  <Theater className="mr-2 h-4 w-4" />
+                  <span>New Performance</span>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/record" className="flex items-center">
+                  <Video className="mr-2 h-4 w-4" />
+                  <span>Record Video</span>
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
       
