@@ -44,8 +44,7 @@ import {
 
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuthContext";
-import { performanceService } from "@/services/performanceService";
-import { rehearsalService } from "@/services/rehearsalService";
+import { dataService } from "@/services/dataService";
 import { googleDriveService } from "@/services/googleDriveService";
 import { Performance, Rehearsal } from "@/types";
 
@@ -69,7 +68,7 @@ export default function PerformanceDetail() {
     queryFn: async () => {
       if (!performanceId) return null;
       console.log("Fetching performance details for ID:", performanceId);
-      const data = await performanceService.getPerformanceById(performanceId);
+      const data = await dataService.getPerformanceById(performanceId);
       console.log("Performance details fetched:", data);
       return data;
     },
@@ -85,7 +84,7 @@ export default function PerformanceDetail() {
     queryKey: ["rehearsals", performanceId],
     queryFn: async () => {
       if (!performanceId) return [];
-      return await rehearsalService.getRehearsalsByPerformance(performanceId);
+      return await dataService.getRehearsalsByPerformance(performanceId);
     },
     enabled: !!performanceId,
   });
@@ -95,7 +94,7 @@ export default function PerformanceDetail() {
     if (!performanceId) return;
     
     try {
-      const success = await performanceService.deletePerformance(performanceId);
+      const success = await dataService.deletePerformance(performanceId);
       
       if (success) {
         toast({
@@ -130,7 +129,15 @@ export default function PerformanceDetail() {
 
   // Get user information
   const getUserById = (userId: string) => {
-    return users.find(user => user.id === userId) || null;
+    // Try to find in the users array from auth context first
+    const authUser = users.find(user => user.id === userId);
+    if (authUser) return authUser;
+    
+    // If not found and it's the current user, return current user
+    if (currentUser && currentUser.id === userId) return currentUser;
+    
+    // Return null if not found
+    return null;
   };
 
   // Sort rehearsals by date (most recent first)
@@ -344,7 +351,7 @@ export default function PerformanceDetail() {
                           <div className="flex items-center">
                             <Avatar className="h-8 w-8 mr-2">
                               <AvatarImage src={creator?.profilePicture} />
-                              <AvatarFallback>{creator?.name.split(" ").map(n => n[0]).join("") || "?"}</AvatarFallback>
+                              <AvatarFallback>{creator?.name ? creator.name.split(" ").map(n => n[0]).join("") : "?"}</AvatarFallback>
                             </Avatar>
                             <span>{creator?.name || "Unknown User"}</span>
                           </div>
@@ -364,7 +371,7 @@ export default function PerformanceDetail() {
                             <Badge key={userId} variant="outline" className="flex items-center">
                               <Avatar className="h-5 w-5 mr-1">
                                 <AvatarImage src={user?.profilePicture} />
-                                <AvatarFallback className="text-[10px]">{user?.name.split(" ").map(n => n[0]).join("") || "?"}</AvatarFallback>
+                                <AvatarFallback className="text-[10px]">{user?.name ? user.name.split(" ").map(n => n[0]).join("") : "?"}</AvatarFallback>
                               </Avatar>
                               <span>{user?.name || "Unknown User"}</span>
                             </Badge>

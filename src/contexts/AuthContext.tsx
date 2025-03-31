@@ -24,6 +24,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // We'll use this array to store all users we've encountered, including the current user
+  const [knownUsers, setKnownUsers] = useState<User[]>(mockUsers);
 
   useEffect(() => {
     console.log("=== AuthProvider Initialization Started ===");
@@ -59,7 +61,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             try {
               const userInfo = extractUserInfo(session.user);
               console.log("Extracted user info:", userInfo);
+              
+              // Update current user
               setCurrentUser(userInfo);
+              
+              // Add to known users if not already present
+              setKnownUsers(prevUsers => {
+                if (!prevUsers.some(u => u.id === userInfo.id)) {
+                  return [...prevUsers, userInfo];
+                }
+                return prevUsers;
+              });
+              
               setSession(session);
               console.log("Authentication state updated after auth state change");
             } catch (error) {
@@ -93,7 +106,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         try {
           const userInfo = extractUserInfo(session.user);
           console.log("Initial extracted user info:", userInfo);
+          
+          // Update current user
           setCurrentUser(userInfo);
+          
+          // Add to known users if not already present
+          setKnownUsers(prevUsers => {
+            if (!prevUsers.some(u => u.id === userInfo.id)) {
+              return [...prevUsers, userInfo];
+            }
+            return prevUsers;
+          });
+          
           setSession(session);
           console.log("Authentication state updated after initial session check");
         } catch (error) {
@@ -120,6 +144,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       const user = await authService.login(email, password);
       setCurrentUser(user);
+      
+      // Add to known users if not already present
+      setKnownUsers(prevUsers => {
+        if (!prevUsers.some(u => u.id === user.id)) {
+          return [...prevUsers, user];
+        }
+        return prevUsers;
+      });
+      
       console.log("User logged in successfully:", user);
     } catch (error) {
       console.error("Login error:", error);
@@ -147,6 +180,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       const newUser = await authService.signup(name, email, password, role);
       setCurrentUser(newUser);
+      
+      // Add to known users if not already present
+      setKnownUsers(prevUsers => {
+        if (!prevUsers.some(u => u.id === newUser.id)) {
+          return [...prevUsers, newUser];
+        }
+        return prevUsers;
+      });
+      
       console.log("User signed up successfully:", newUser);
     } catch (error) {
       console.error("Signup error:", error);
@@ -168,9 +210,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
+  // Combine mock users with current user for the users array
+  const allUsers = currentUser 
+    ? [...knownUsers.filter(u => u.id !== currentUser.id), currentUser] 
+    : knownUsers;
+
   const value = {
     currentUser,
-    users: mockUsers,
+    users: allUsers,
     isLoading,
     isAuthenticated: !!currentUser,
     login,
@@ -184,7 +231,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     isAuthenticated: !!currentUser,
     hasSession: !!session,
     isLoading,
-    sessionExpiration: session ? new Date(session.expires_at * 1000).toISOString() : "No session"
+    sessionExpiration: session ? new Date(session.expires_at * 1000).toISOString() : "No session",
+    usersList: allUsers.map(u => u.name)
   });
 
   return (

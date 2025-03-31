@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { PerformanceForm } from "@/components/PerformanceForm";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuthContext";
-import { performanceService } from "@/services/performanceService";
+import { dataService } from "@/services/dataService";
 import { googleDriveService } from "@/services/googleDriveService";
 
 export default function PerformanceNew() {
@@ -37,7 +37,7 @@ export default function PerformanceNew() {
       };
 
       console.log("Creating performance with formatted values:", formattedValues);
-      const performance = await performanceService.createPerformance(formattedValues);
+      const performance = await dataService.createPerformance(formattedValues);
       
       if (performance) {
         console.log("Performance created successfully, navigating to:", `/performances/${performance.id}`);
