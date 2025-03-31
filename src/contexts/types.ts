@@ -14,6 +14,8 @@ export interface AuthContextType {
   users: User[];
   isLoading: boolean;
   isAuthenticated: boolean;
+  isDriveConnected: boolean;
+  checkDriveConnection: () => Promise<boolean>;
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   signup: (name: string, email: string, password: string, role?: "performer" | "choreographer") => Promise<void>;

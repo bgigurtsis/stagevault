@@ -9,6 +9,7 @@ import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import Profile from "./pages/Profile";
 import Performances from "./pages/Performances";
 import PerformanceDetail from "./pages/PerformanceDetail";
 import PerformanceNew from "./pages/PerformanceNew";
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="/signup" element={<Signup />} />
             <Route element={<Layout />}>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/profile" element={<Profile />} />
               <Route path="/performances" element={<Performances />} />
               <Route path="/performances/new" element={<PerformanceNew />} />
               <Route path="/performances/:performanceId" element={<PerformanceDetail />} />

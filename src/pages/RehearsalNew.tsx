@@ -5,16 +5,28 @@ import { useToast } from "@/hooks/use-toast";
 import { Rehearsal } from "@/types";
 import { rehearsalService } from "@/services/rehearsalService";
 import RehearsalForm from "@/components/RehearsalForm";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useAuth } from "@/hooks/useAuthContext";
 
 export default function RehearsalNew() {
   const [loading, setLoading] = useState(false);
   const { performanceId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isDriveConnected } = useAuth();
 
   const handleCreateRehearsal = async (rehearsal: Omit<Rehearsal, "id" | "createdAt" | "updatedAt">): Promise<void> => {
+    if (!isDriveConnected) {
+      toast({
+        title: "Google Drive required",
+        description: "You need to connect your Google Drive account in Profile settings to create rehearsals.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       await rehearsalService.createRehearsal({
@@ -64,6 +76,21 @@ export default function RehearsalNew() {
         </Button>
         <h1 className="text-3xl font-bold tracking-tight">New Rehearsal</h1>
       </div>
+
+      {!isDriveConnected && (
+        <Alert variant="warning" className="bg-amber-50 border-amber-200">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Google Drive not connected</AlertTitle>
+          <AlertDescription>
+            You need to connect your Google Drive account to create rehearsals with storage folders.
+            <div className="mt-2">
+              <Button onClick={() => navigate("/profile")} variant="outline" size="sm">
+                Go to Profile Settings
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <RehearsalForm onSubmit={handleCreateRehearsal} performanceId={performanceId} />
     </div>

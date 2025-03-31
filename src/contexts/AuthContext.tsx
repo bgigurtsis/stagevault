@@ -5,12 +5,15 @@ import { Session } from "@supabase/supabase-js";
 import { AuthContextType, User, AuthProviderProps } from "./types";
 import { mockUsers, extractUserInfo } from "@/utils/authUtils";
 import { authService } from "@/services/authService";
+import { googleDriveService } from "@/services/googleDriveService";
 
 export const AuthContext = createContext<AuthContextType>({
   currentUser: null,
   users: [],
   isLoading: true,
   isAuthenticated: false,
+  isDriveConnected: false,
+  checkDriveConnection: async () => false,
   login: async () => {},
   loginWithGoogle: async () => {},
   signup: async () => {},
@@ -24,6 +27,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDriveConnected, setIsDriveConnected] = useState(false);
   // We'll use this array to store all users we've encountered, including the current user
   const [knownUsers, setKnownUsers] = useState<User[]>(mockUsers);
 
@@ -51,9 +55,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           if (session.provider_token) {
             console.log("Provider token exists (first 20 chars):", session.provider_token.substring(0, 20) + "...");
             console.log("Provider refresh token exists:", !!session.provider_refresh_token);
+            
+            // If we have a provider token, check if Drive is connected
+            setTimeout(() => {
+              checkDriveConnection();
+            }, 0);
           } else {
             console.warn("No provider token in session - Google Drive API won't work!");
             console.log("Full session object:", JSON.stringify(session, null, 2));
+            setIsDriveConnected(false);
           }
           
           // Adding a delay here to try to avoid race conditions
@@ -83,6 +93,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           console.log("No user in session, setting currentUser to null");
           setCurrentUser(null);
           setSession(null);
+          setIsDriveConnected(false);
         }
         
         setIsLoading(false);
@@ -102,6 +113,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         console.log("Initial user found:", session.user.id);
         console.log("Initial user email:", session.user.email);
         console.log("Initial user metadata:", JSON.stringify(session.user.user_metadata));
+        
+        // If we have a session, check if Drive is connected
+        if (session.provider_token) {
+          setTimeout(() => {
+            checkDriveConnection();
+          }, 0);
+        } else {
+          setIsDriveConnected(false);
+        }
         
         try {
           const userInfo = extractUserInfo(session.user);
@@ -136,6 +156,21 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       subscription.unsubscribe();
     };
   }, []);
+
+  // Check if Google Drive is connected
+  const checkDriveConnection = async (): Promise<boolean> => {
+    console.log("Checking Google Drive connection...");
+    try {
+      const result = await googleDriveService.testDriveAccess();
+      console.log("Drive connection test result:", result);
+      setIsDriveConnected(result.success);
+      return result.success;
+    } catch (error) {
+      console.error("Error checking Drive connection:", error);
+      setIsDriveConnected(false);
+      return false;
+    }
+  };
 
   // Auth methods that utilize our service layer
   const login = async (email: string, password: string) => {
@@ -220,6 +255,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     users: allUsers,
     isLoading,
     isAuthenticated: !!currentUser,
+    isDriveConnected,
+    checkDriveConnection,
     login,
     loginWithGoogle,
     signup,
@@ -231,6 +268,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     isAuthenticated: !!currentUser,
     hasSession: !!session,
     isLoading,
+    isDriveConnected,
     sessionExpiration: session ? new Date(session.expires_at * 1000).toISOString() : "No session",
     usersList: allUsers.map(u => u.name)
   });
