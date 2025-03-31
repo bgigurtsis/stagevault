@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { 
   Theater, 
   Plus, 
@@ -53,22 +54,63 @@ export default function Performances() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [performanceToDelete, setPerformanceToDelete] = useState<Performance | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
-  // Fetch performances from Supabase
-  const { data: performances = [], isLoading, error } = useQuery({
+  // Fetch performances from Supabase using React Query
+  const { 
+    data: performances = [], 
+    isLoading: isLoadingPerformances, 
+    error: performancesError,
+    refetch: refetchPerformances
+  } = useQuery({
     queryKey: ["performances"],
     queryFn: async () => {
-      const data = await performanceService.getPerformances();
-      return data;
+      return await performanceService.getPerformances();
     }
   });
   
   // Fetch rehearsals to count them
-  const { data: rehearsals = [] } = useQuery({
+  const { 
+    data: rehearsals = [],
+    isLoading: isLoadingRehearsals
+  } = useQuery({
     queryKey: ["rehearsals"],
     queryFn: async () => {
       return await rehearsalService.getAllRehearsals();
     }
+  });
+
+  // Performance deletion mutation
+  const deletePerformanceMutation = useMutation({
+    mutationFn: async (performanceId: string) => {
+      return await performanceService.deletePerformance(performanceId);
+    },
+    onMutate: () => {
+      setIsDeleting(true);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Performance deleted",
+        description: `"${performanceToDelete?.title}" has been deleted successfully.`,
+      });
+      
+      // Invalidate the performances query to refresh the data
+      queryClient.invalidateQueries({ queryKey: ["performances"] });
+      
+      // Reset state
+      setPerformanceToDelete(null);
+    },
+    onError: (error) => {
+      console.error("Error deleting performance:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to delete performance. Please try again.",
+      });
+    },
+    onSettled: () => {
+      setIsDeleting(false);
+    },
   });
   
   // Filter performances based on search query
@@ -112,34 +154,17 @@ export default function Performances() {
   // Handle performance deletion
   const handleDeletePerformance = async () => {
     if (!performanceToDelete) return;
-    
-    try {
-      const success = await performanceService.deletePerformance(performanceToDelete.id);
-      
-      if (success) {
-        toast({
-          title: "Performance deleted",
-          description: `"${performanceToDelete.title}" has been deleted successfully.`,
-        });
-        
-        // Invalidate the performances query to refresh the data
-        queryClient.invalidateQueries({ queryKey: ["performances"] });
-      } else {
-        throw new Error("Failed to delete performance");
-      }
-    } catch (error) {
-      console.error("Error deleting performance:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to delete performance. Please try again.",
-      });
-    } finally {
-      setPerformanceToDelete(null);
-    }
+    deletePerformanceMutation.mutate(performanceToDelete.id);
   };
 
-  if (error) {
+  // Handle errors
+  const handleRetry = () => {
+    refetchPerformances();
+  };
+
+  const isLoading = isLoadingPerformances || isLoadingRehearsals;
+
+  if (performancesError && !isLoading) {
     return (
       <div className="container max-w-6xl py-6 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -155,9 +180,9 @@ export default function Performances() {
           </div>
           <h2 className="text-xl font-semibold">Error loading performances</h2>
           <p className="text-muted-foreground mt-1 mb-4 max-w-md">
-            {(error as Error).message || "Failed to fetch performances. Please try again."}
+            {(performancesError as Error).message || "Failed to fetch performances. Please try again."}
           </p>
-          <Button onClick={() => queryClient.invalidateQueries({ queryKey: ["performances"] })}>
+          <Button onClick={handleRetry}>
             Retry
           </Button>
         </div>
@@ -198,12 +223,17 @@ export default function Performances() {
           className="md:w-auto"
         >
           <div className="flex gap-2">
-            <Button variant="outline" className="flex-1 md:flex-none" onClick={toggleSortDirection}>
+            <Button 
+              variant="outline" 
+              className="flex-1 md:flex-none" 
+              onClick={toggleSortDirection}
+              disabled={isLoading}
+            >
               Sort by Date {sortDirection === "asc" ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />}
             </Button>
             
             <CollapsibleTrigger asChild>
-              <Button variant="outline" className="md:hidden">
+              <Button variant="outline" className="md:hidden" disabled={isLoading}>
                 <Filter className="h-4 w-4" />
               </Button>
             </CollapsibleTrigger>
@@ -213,11 +243,11 @@ export default function Performances() {
             <div className="space-y-2">
               <h3 className="text-sm font-medium">Date Range</h3>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1">
+                <Button variant="outline" size="sm" className="flex-1" disabled={isLoading}>
                   <Calendar className="mr-2 h-4 w-4" />
                   Start
                 </Button>
-                <Button variant="outline" size="sm" className="flex-1">
+                <Button variant="outline" size="sm" className="flex-1" disabled={isLoading}>
                   <Calendar className="mr-2 h-4 w-4" />
                   End
                 </Button>
@@ -255,57 +285,24 @@ export default function Performances() {
           {sortedPerformances.map((performance) => (
             <Card key={performance.id} className="overflow-hidden flex flex-col">
               <Link to={`/performances/${performance.id}`} className="flex-1">
-                <div className="aspect-video bg-muted relative overflow-hidden">
-                  {performance.coverImage ? (
-                    <img
-                      src={performance.coverImage}
-                      alt={performance.title}
-                      className="w-full h-full object-cover transition-transform hover:scale-105"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-muted">
-                      <Theater className="h-12 w-12 text-muted-foreground/50" />
-                    </div>
-                  )}
+                <div className="aspect-video bg-muted flex items-center justify-center p-4">
+                  <Theater className="h-12 w-12 text-muted-foreground/50" />
                 </div>
                 <CardContent className="p-4">
-                  <h2 className="text-xl font-semibold mb-2 line-clamp-1">{performance.title}</h2>
+                  <h3 className="text-lg font-semibold mb-1">{performance.title}</h3>
                   {performance.description && (
-                    <p className="text-muted-foreground text-sm mb-3 line-clamp-2">
-                      {performance.description}
-                    </p>
+                    <p className="text-muted-foreground text-sm line-clamp-2 mb-3">{performance.description}</p>
                   )}
-                  
-                  {/* Rehearsal count */}
-                  <div className="flex items-center text-sm text-muted-foreground mb-3">
-                    <PlaySquare className="h-4 w-4 mr-1" />
-                    <span>{getRehearsalCount(performance.id)} rehearsals</span>
-                  </div>
-                  
-                  {/* Performers list */}
-                  {performance.taggedUsers && performance.taggedUsers.length > 0 && (
-                    <div className="flex items-center text-sm">
-                      <Users className="h-4 w-4 mr-2 text-muted-foreground" />
-                      <div className="flex -space-x-2 overflow-hidden">
-                        {performance.taggedUsers.slice(0, 3).map((userId, index) => {
-                          const user = getUserById(userId);
-                          return (
-                            <Avatar key={index} className="h-6 w-6 border-2 border-background">
-                              <AvatarImage src={user?.profilePicture} />
-                              <AvatarFallback className="text-[10px]">
-                                {user ? user.name.split(" ").map(n => n[0]).join("") : userId.substring(0, 2)}
-                              </AvatarFallback>
-                            </Avatar>
-                          );
-                        })}
-                        {performance.taggedUsers.length > 3 && (
-                          <div className="flex items-center justify-center h-6 w-6 rounded-full bg-muted text-[10px] font-medium">
-                            +{performance.taggedUsers.length - 3}
-                          </div>
-                        )}
-                      </div>
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground mt-2">
+                    <div className="flex items-center">
+                      <Calendar className="h-4 w-4 mr-1" />
+                      <span>{performance.startDate ? formatDate(performance.startDate) : "No date"}</span>
                     </div>
-                  )}
+                    <div className="flex items-center">
+                      <PlaySquare className="h-4 w-4 mr-1" />
+                      <span>{getRehearsalCount(performance.id)} {getRehearsalCount(performance.id) === 1 ? "rehearsal" : "rehearsals"}</span>
+                    </div>
+                  </div>
                 </CardContent>
               </Link>
               <CardFooter className="p-4 pt-0 flex items-center justify-between">
@@ -318,7 +315,7 @@ export default function Performances() {
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isDeleting}>
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -330,6 +327,7 @@ export default function Performances() {
                     <DropdownMenuItem 
                       className="text-destructive"
                       onClick={() => setPerformanceToDelete(performance)}
+                      disabled={isDeleting}
                     >
                       <Trash className="mr-2 h-4 w-4" />
                       <span>Delete</span>
@@ -353,9 +351,20 @@ export default function Performances() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeletePerformance} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeletePerformance} 
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

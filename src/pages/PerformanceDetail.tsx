@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { 
   Theater, 
   Calendar, 
@@ -14,12 +14,13 @@ import {
   Edit,
   Trash,
   MoreVertical,
-  Flag
+  Flag,
+  Loader2
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -43,7 +44,8 @@ import {
 
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuthContext";
-import { dataService } from "@/services/dataService";
+import { performanceService } from "@/services/performanceService";
+import { rehearsalService } from "@/services/rehearsalService";
 import { Performance, Rehearsal } from "@/types";
 
 export default function PerformanceDetail() {
@@ -54,6 +56,7 @@ export default function PerformanceDetail() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("overview");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch performance details
   const { 
@@ -65,7 +68,7 @@ export default function PerformanceDetail() {
     queryFn: async () => {
       if (!performanceId) return null;
       console.log("Fetching performance details for ID:", performanceId);
-      const data = await dataService.getPerformanceById(performanceId);
+      const data = await performanceService.getPerformanceById(performanceId);
       console.log("Performance details fetched:", data);
       return data;
     },
@@ -81,37 +84,53 @@ export default function PerformanceDetail() {
     queryKey: ["rehearsals", performanceId],
     queryFn: async () => {
       if (!performanceId) return [];
-      return await dataService.getRehearsalsByPerformance(performanceId);
+      return await rehearsalService.getRehearsalsByPerformance(performanceId);
     },
     enabled: !!performanceId,
   });
 
-  // Handle performance deletion
-  const handleDeletePerformance = async () => {
-    if (!performanceId) return;
-    
-    try {
-      const success = await dataService.deletePerformance(performanceId);
+  // Handle performance deletion using useQueryMutation
+  const deletePerformanceMutation = useMutation({
+    mutationFn: async () => {
+      if (!performanceId) throw new Error("Performance ID is required");
+      return await performanceService.deletePerformance(performanceId);
+    },
+    onMutate: () => {
+      setIsDeleting(true);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Performance deleted",
+        description: "Performance has been deleted successfully.",
+      });
       
-      if (success) {
-        toast({
-          title: "Performance deleted",
-          description: "Performance has been deleted successfully.",
-        });
-        navigate("/performances");
-      } else {
-        throw new Error("Failed to delete performance");
-      }
-    } catch (error) {
+      // Invalidate related queries
+      queryClient.invalidateQueries({ queryKey: ["performances"] });
+      queryClient.removeQueries({ queryKey: ["performance", performanceId] });
+      
+      // Navigate after a short delay to ensure state updates have completed
+      setTimeout(() => {
+        navigate("/performances", { replace: true });
+      }, 100);
+    },
+    onError: (error) => {
       console.error("Error deleting performance:", error);
       toast({
         title: "Error",
         description: "Failed to delete performance. Please try again.",
         variant: "destructive",
       });
-    } finally {
+      setIsDeleting(false);
       setIsDeleteDialogOpen(false);
-    }
+    },
+    onSettled: () => {
+      setIsDeleting(false);
+    },
+  });
+
+  // Handle performance deletion
+  const handleDeletePerformance = async () => {
+    deletePerformanceMutation.mutate();
   };
 
   // Helper function to format date
@@ -194,6 +213,7 @@ export default function PerformanceDetail() {
             variant="ghost" 
             size="icon" 
             onClick={() => navigate("/performances")}
+            disabled={isDeleting}
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
@@ -212,6 +232,7 @@ export default function PerformanceDetail() {
           <Button 
             variant="outline"
             onClick={() => navigate(`/rehearsals/new?performanceId=${performance.id}`)}
+            disabled={isDeleting}
           >
             <Plus className="mr-2 h-4 w-4" />
             Add Rehearsal
@@ -219,7 +240,7 @@ export default function PerformanceDetail() {
           
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon">
+              <Button variant="outline" size="icon" disabled={isDeleting}>
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -242,8 +263,8 @@ export default function PerformanceDetail() {
       </div>
       
       {/* Performance Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
+      <div className="grid grid-cols-1 gap-6">
+        <div className="space-y-6">
           <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="mb-4">
               <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -255,8 +276,16 @@ export default function PerformanceDetail() {
             <TabsContent value="overview" className="space-y-6">
               {/* Performance Details */}
               <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-start justify-between">
                   <h2 className="text-xl font-semibold">Performance Details</h2>
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/performances/${performance.id}/edit`)}
+                  >
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit Performance
+                  </Button>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {performance.description && (
@@ -485,36 +514,6 @@ export default function PerformanceDetail() {
             </TabsContent>
           </Tabs>
         </div>
-        
-        <div>
-          {/* Cover Image */}
-          <Card className="overflow-hidden">
-            {performance.coverImage ? (
-              <div className="aspect-video w-full">
-                <img
-                  src={performance.coverImage}
-                  alt={performance.title}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            ) : (
-              <div className="aspect-video w-full bg-muted flex items-center justify-center">
-                <Theater className="h-12 w-12 text-muted-foreground" />
-              </div>
-            )}
-            
-            <CardFooter className="p-4 flex justify-center">
-              <Button 
-                variant="outline"
-                size="sm"
-                onClick={() => navigate(`/performances/${performance.id}/edit`)}
-              >
-                <Edit className="mr-2 h-4 w-4" />
-                Edit Performance
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
       </div>
       
       {/* Delete Confirmation Dialog */}
@@ -528,12 +527,20 @@ export default function PerformanceDetail() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleDeletePerformance}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeleting}
             >
-              Delete
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

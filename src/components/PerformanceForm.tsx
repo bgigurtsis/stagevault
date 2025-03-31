@@ -31,7 +31,6 @@ import { cn } from "@/lib/utils";
 const formSchema = z.object({
   title: z.string().min(1, { message: "Title is required" }),
   description: z.string().optional(),
-  coverImage: z.string().optional(),
   startDate: z.date().optional(),
   endDate: z.date().optional().nullable(),
   taggedUsers: z.array(z.string()).optional(),
@@ -59,7 +58,6 @@ export function PerformanceForm({
     defaultValues: {
       title: performance?.title || "",
       description: performance?.description || "",
-      coverImage: performance?.coverImage || "",
       startDate: performance?.startDate ? new Date(performance.startDate) : undefined,
       endDate: performance?.endDate ? new Date(performance.endDate) : undefined,
       taggedUsers: performance?.taggedUsers || [],
@@ -93,24 +91,6 @@ export function PerformanceForm({
                 <Textarea 
                   placeholder="Enter performance description" 
                   className="min-h-24"
-                  {...field} 
-                  value={field.value || ""}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="coverImage"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Cover Image URL</FormLabel>
-              <FormControl>
-                <Input 
-                  placeholder="https://example.com/image.jpg" 
                   {...field} 
                   value={field.value || ""}
                 />

@@ -5,7 +5,6 @@ export interface Performance {
   id: string;
   title: string;
   description?: string;
-  coverImage?: string;
   startDate?: string;
   endDate?: string;
   createdAt: string;

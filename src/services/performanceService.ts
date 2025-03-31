@@ -6,7 +6,6 @@ import { googleDriveService } from "./googleDriveService";
 export interface CreatePerformanceData {
   title: string;
   description?: string;
-  coverImage?: string;
   startDate?: string;
   endDate?: string;
   taggedUsers?: string[];
@@ -33,7 +32,6 @@ export class PerformanceService extends BaseService {
       id: p.id,
       title: p.title,
       description: p.description || undefined,
-      coverImage: p.cover_image || undefined,
       startDate: p.start_date || undefined,
       endDate: p.end_date || undefined,
       createdAt: p.created_at,
@@ -69,7 +67,6 @@ export class PerformanceService extends BaseService {
       id: data.id,
       title: data.title,
       description: data.description || undefined,
-      coverImage: data.cover_image || undefined,
       startDate: data.start_date || undefined,
       endDate: data.end_date || undefined,
       createdAt: data.created_at,
@@ -107,7 +104,6 @@ export class PerformanceService extends BaseService {
         .insert({
           title: performanceData.title,
           description: performanceData.description,
-          cover_image: performanceData.coverImage,
           start_date: performanceData.startDate,
           end_date: performanceData.endDate,
           tagged_users: performanceData.taggedUsers,
@@ -128,7 +124,6 @@ export class PerformanceService extends BaseService {
         id: data.id,
         title: data.title,
         description: data.description || undefined,
-        coverImage: data.cover_image || undefined,
         startDate: data.start_date || undefined,
         endDate: data.end_date || undefined,
         createdAt: data.created_at,
@@ -148,7 +143,6 @@ export class PerformanceService extends BaseService {
     
     if (performanceData.title !== undefined) updateData.title = performanceData.title;
     if (performanceData.description !== undefined) updateData.description = performanceData.description;
-    if (performanceData.coverImage !== undefined) updateData.cover_image = performanceData.coverImage;
     if (performanceData.startDate !== undefined) updateData.start_date = performanceData.startDate;
     if (performanceData.endDate !== undefined) updateData.end_date = performanceData.endDate;
     if (performanceData.taggedUsers !== undefined) updateData.tagged_users = performanceData.taggedUsers;
@@ -169,7 +163,6 @@ export class PerformanceService extends BaseService {
       id: data.id,
       title: data.title,
       description: data.description || undefined,
-      coverImage: data.cover_image || undefined,
       startDate: data.start_date || undefined,
       endDate: data.end_date || undefined,
       createdAt: data.created_at,
@@ -182,41 +175,55 @@ export class PerformanceService extends BaseService {
   
   async deletePerformance(id: string): Promise<boolean> {
     try {
-      // Get the performance to retrieve the Drive folder ID
+      console.log(`Starting deletion process for performance with ID: ${id}`);
+      
+      // First, get the performance to retrieve the Drive folder ID
       const performance = await this.getPerformanceById(id);
       
-      // Delete the Google Drive folder if it exists
-      if (performance?.driveFolderId) {
-        try {
-          console.log(`Attempting to delete Google Drive folder with ID: ${performance.driveFolderId}`);
-          const folderDeleted = await googleDriveService.deleteFolder(performance.driveFolderId);
-          
-          if (folderDeleted) {
-            console.log(`Successfully deleted Google Drive folder for performance: ${id}`);
-          } else {
-            console.warn(`Failed to delete Google Drive folder for performance: ${id}`);
-          }
-        } catch (driveError) {
-          console.error(`Error deleting Google Drive folder for performance ${id}:`, driveError);
-          // Continue with database deletion even if folder deletion fails
+      // Prepare for database deletion regardless of Drive folder success
+      const deleteDatabaseRecord = async () => {
+        console.log(`Deleting performance from database, ID: ${id}`);
+        const { error } = await this.supabase
+          .from("performances")
+          .delete()
+          .eq("id", id);
+        
+        if (error) {
+          console.error("Error deleting performance from database:", error);
+          throw new Error(`Database deletion failed: ${error.message}`);
         }
+        
+        console.log(`Successfully deleted performance ${id} from database`);
+        return true;
+      };
+      
+      // If there's no Drive folder or no performance found, just delete from database
+      if (!performance || !performance.driveFolderId) {
+        console.log(`No Drive folder found for performance ${id}, proceeding with database deletion only`);
+        return await deleteDatabaseRecord();
       }
       
-      // Delete the performance from the database
-      const { error } = await this.supabase
-        .from("performances")
-        .delete()
-        .eq("id", id);
-      
-      if (error) {
-        console.error("Error deleting performance:", error);
-        return false;
+      // Try to delete the Google Drive folder, but continue with DB deletion even if it fails
+      try {
+        console.log(`Attempting to delete Google Drive folder with ID: ${performance.driveFolderId}`);
+        const folderDeleted = await googleDriveService.deleteFolder(performance.driveFolderId);
+        
+        if (folderDeleted) {
+          console.log(`Successfully deleted Google Drive folder for performance: ${id}`);
+        } else {
+          console.warn(`Failed to delete Google Drive folder for performance: ${id}, but will continue with database deletion`);
+        }
+      } catch (driveError) {
+        // Log the error but don't throw - we still want to delete the database record
+        console.error(`Error deleting Google Drive folder for performance ${id}:`, driveError);
+        console.log(`Continuing with database deletion despite Drive folder deletion failure`);
       }
       
-      return true;
+      // Proceed with database deletion
+      return await deleteDatabaseRecord();
     } catch (error) {
       console.error("Unexpected error during performance deletion:", error);
-      return false;
+      throw error; // Re-throw to allow caller to handle it
     }
   }
 }

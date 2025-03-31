@@ -1,7 +1,8 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Theater, ArrowRight, Clock, Plus, Calendar, Search, Video } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Theater, ArrowRight, Clock, Plus, Calendar, Search, Video, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,43 +20,45 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export default function Dashboard() {
-  const {
-    currentUser
-  } = useAuth();
-  const {
-    toast
-  } = useToast();
+  const { currentUser } = useAuth();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
-  const [performances, setPerformances] = useState<Performance[]>([]);
-  const [recordings, setRecordings] = useState<Recording[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      setIsLoading(true);
+  // Fetch performances with React Query
+  const {
+    data: performances = [],
+    isLoading: isLoadingPerformances,
+    error: performancesError,
+    refetch: refetchPerformances
+  } = useQuery({
+    queryKey: ["dashboard-performances"],
+    queryFn: async () => {
       try {
-        const performancesData = await performanceService.getPerformances();
-        setPerformances(performancesData);
-        try {
-          const recordingsData = await recordingService.getRecentRecordings();
-          setRecordings(recordingsData);
-        } catch (error) {
-          console.error("Error fetching recordings:", error);
-          setRecordings([]);
-        }
+        return await performanceService.getPerformances();
       } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-        toast({
-          title: "Error loading data",
-          description: "There was a problem loading your dashboard data.",
-          variant: "destructive"
-        });
-      } finally {
-        setIsLoading(false);
+        console.error("Error fetching performances:", error);
+        throw error;
       }
-    };
-    fetchDashboardData();
-  }, [toast]);
+    }
+  });
+
+  // Fetch recordings with React Query
+  const {
+    data: recordings = [],
+    isLoading: isLoadingRecordings,
+    error: recordingsError,
+    refetch: refetchRecordings
+  } = useQuery({
+    queryKey: ["dashboard-recordings"],
+    queryFn: async () => {
+      try {
+        return await recordingService.getRecentRecordings();
+      } catch (error) {
+        console.error("Error fetching recordings:", error);
+        return [];
+      }
+    }
+  });
 
   const recentPerformances = performances.slice(0, 3);
   const recentRecordings = recordings.slice(0, 3);
@@ -73,6 +76,20 @@ export default function Dashboard() {
     const remainingSeconds = seconds % 60;
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
+
+  // Handle retrying failed requests
+  const handleRetry = () => {
+    if (performancesError) refetchPerformances();
+    if (recordingsError) refetchRecordings();
+    
+    toast({
+      title: "Retrying",
+      description: "Attempting to fetch your data again...",
+    });
+  };
+
+  const isLoading = isLoadingPerformances || isLoadingRecordings;
+  const hasError = performancesError || recordingsError;
 
   if (isLoading) {
     return <div className="container max-w-6xl py-6 space-y-8">
@@ -109,6 +126,30 @@ export default function Dashboard() {
           </div>
         </div>
       </div>;
+  }
+
+  if (hasError && !isLoading) {
+    return <div className="container max-w-6xl py-8 space-y-8">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">
+            Welcome back, {currentUser?.name?.split(' ')[0] || 'User'}
+          </p>
+        </div>
+      </div>
+      
+      <div className="bg-destructive/10 rounded-lg p-6 text-center">
+        <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
+        <h2 className="text-xl font-bold mb-2">Error Loading Dashboard</h2>
+        <p className="text-muted-foreground mb-4 max-w-md mx-auto">
+          We encountered a problem while loading your dashboard data. This could be due to a network issue or a temporary server problem.
+        </p>
+        <Button onClick={handleRetry}>
+          Try Again
+        </Button>
+      </div>
+    </div>;
   }
 
   return <div className="container max-w-6xl py-6 space-y-8">
@@ -189,10 +230,8 @@ export default function Dashboard() {
           </Card> : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {recentPerformances.map(performance => <Card key={performance.id} className="flex flex-col overflow-hidden">
                 <Link to={`/performances/${performance.id}`} className="group">
-                  <div className="aspect-video bg-muted relative overflow-hidden">
-                    {performance.coverImage ? <img src={performance.coverImage} alt={performance.title} className="w-full h-full object-cover transition-transform group-hover:scale-105" /> : <div className="w-full h-full flex items-center justify-center bg-muted">
-                        <Theater className="h-10 w-10 text-muted-foreground/50" />
-                      </div>}
+                  <div className="aspect-video bg-muted flex items-center justify-center p-4">
+                    <Theater className="h-12 w-12 text-muted-foreground/50" />
                   </div>
                   <CardHeader className="p-4 pb-2">
                     <CardTitle className="text-lg">{performance.title}</CardTitle>
