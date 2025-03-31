@@ -1,5 +1,6 @@
 
 import React from 'react';
+import GeoPattern from 'geopattern';
 import { Theater } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -14,15 +15,10 @@ export const PerformanceThumbnail: React.FC<PerformanceThumbnailProps> = ({
   className = "",
   fallbackIcon = true 
 }) => {
-  // Generate a simple gradient background based on the title's length
-  const getColorFromString = (str: string) => {
-    const charSum = str.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const hue = charSum % 360;
-    return `hsl(${hue}, 70%, 65%)`;
-  };
-  
-  const primaryColor = getColorFromString(title);
-  const secondaryColor = `hsl(${(parseInt(primaryColor.slice(4, primaryColor.indexOf(','))) + 40) % 360}, 70%, 75%)`;
+  // Generate pattern based on the performance title
+  const pattern = GeoPattern.generate(title, {
+    baseColor: '#9b87f5' // Using a purple base color that matches the app theme
+  });
   
   return (
     <div 
@@ -35,7 +31,8 @@ export const PerformanceThumbnail: React.FC<PerformanceThumbnailProps> = ({
       <div 
         className="absolute inset-0 w-full h-full"
         style={{ 
-          background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+          backgroundImage: pattern.toDataUrl(),
+          backgroundSize: 'cover'
         }}
       />
       
