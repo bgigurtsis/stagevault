@@ -204,7 +204,14 @@ export default function RehearsalForm({ rehearsal, onSubmit, performanceId }: Re
           <Button 
             type="button" 
             variant="outline" 
-            onClick={() => performanceId ? navigate(`/performances/${performanceId}`) : navigate("/rehearsals")}
+            onClick={() => {
+              // Navigate back to the performance detail page if we have a performanceId
+              if (selectedPerformanceId) {
+                navigate(`/performances/${selectedPerformanceId}`);
+              } else {
+                navigate("/rehearsals");
+              }
+            }}
           >
             Cancel
           </Button>

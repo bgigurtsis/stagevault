@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Rehearsal } from "@/types";
 import { rehearsalService } from "@/services/rehearsalService";
@@ -12,7 +12,13 @@ import { useAuth } from "@/hooks/useAuthContext";
 
 export default function RehearsalNew() {
   const [loading, setLoading] = useState(false);
-  const { performanceId } = useParams();
+  const { performanceId: urlParamPerformanceId } = useParams();
+  const [searchParams] = useSearchParams();
+  const queryPerformanceId = searchParams.get("performanceId");
+  
+  // Use performanceId from either URL params or query params
+  const performanceId = urlParamPerformanceId || queryPerformanceId || undefined;
+  
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isDriveConnected } = useAuth();
@@ -45,8 +51,8 @@ export default function RehearsalNew() {
       });
       
       // Navigate back to performance detail or rehearsals list
-      if (performanceId) {
-        navigate(`/performances/${performanceId}`);
+      if (rehearsal.performanceId) {
+        navigate(`/performances/${rehearsal.performanceId}`);
       } else {
         navigate("/rehearsals");
       }
