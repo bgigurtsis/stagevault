@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -16,7 +15,7 @@ import {
   PlaySquare,
   AlertTriangle,
   Loader2,
-  Calendar // Add Calendar import here
+  Calendar
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +44,7 @@ import { rehearsalService } from "@/services/rehearsalService";
 import { Performance } from "@/types";
 import { PerformanceStatusBadge } from "@/components/performance/PerformanceStatusBadge";
 import { PerformanceDate } from "@/components/performance/PerformanceDate";
+import { PerformanceThumbnail } from "@/components/performance/PerformanceThumbnail";
 
 export default function Performances() {
   const { users, currentUser } = useAuth();
@@ -274,9 +274,10 @@ export default function Performances() {
           {sortedPerformances.map((performance) => (
             <Card key={performance.id} className="overflow-hidden flex flex-col">
               <Link to={`/performances/${performance.id}`} className="flex-1">
-                <div className="aspect-video bg-muted flex items-center justify-center p-4">
-                  <Theater className="h-12 w-12 text-muted-foreground/50" />
-                </div>
+                <PerformanceThumbnail 
+                  title={performance.title} 
+                  className="w-full"
+                />
                 <CardContent className="p-4">
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="text-lg font-semibold">{performance.title}</h3>
