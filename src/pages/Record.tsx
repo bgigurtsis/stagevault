@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { 
@@ -26,6 +27,7 @@ import { googleDriveService } from "@/services/googleDriveService";
 import { performanceService } from "@/services/performanceService";
 import { rehearsalService } from "@/services/rehearsalService";
 import { Performance } from "@/types";
+import { RecordingForm } from "@/components/recording/RecordingForm";
 import "./Record.css";
 
 export default function Record() {
@@ -110,12 +112,12 @@ export default function Record() {
     const loadPerformanceContext = async () => {
       try {
         if (performanceIdParam) {
-          const performance = await performanceService.getPerformance(performanceIdParam);
+          const performance = await performanceService.getPerformanceById(performanceIdParam);
           setCurrentPerformance(performance);
         } else if (rehearsalIdParam) {
-          const rehearsal = await rehearsalService.getRehearsal(rehearsalIdParam);
+          const rehearsal = await rehearsalService.getRehearsalById(rehearsalIdParam);
           if (rehearsal.performanceId) {
-            const performance = await performanceService.getPerformance(rehearsal.performanceId);
+            const performance = await performanceService.getPerformanceById(rehearsal.performanceId);
             setCurrentPerformance(performance);
           }
         } else {
@@ -271,7 +273,8 @@ export default function Record() {
       if (!videoTrack) return;
       
       const capabilities = videoTrack.getCapabilities();
-      if (!capabilities.torch) {
+      // Check if the torch capability exists before accessing it
+      if (!capabilities || typeof capabilities === 'undefined' || !('torch' in capabilities)) {
         toast({
           title: "Flash not supported",
           description: "Your camera does not support flash/torch mode",
@@ -281,8 +284,13 @@ export default function Record() {
       }
       
       const newFlashState = !flashEnabled;
+      
+      // Use advanced constraints with the torch property only if supported
       await videoTrack.applyConstraints({
-        advanced: [{ torch: newFlashState }]
+        advanced: [{ 
+          // Add the torch property only if it's supported
+          ...(('torch' in capabilities) && { torch: newFlashState })
+        }]
       });
       
       setFlashEnabled(newFlashState);
@@ -512,6 +520,66 @@ export default function Record() {
     
     logDebug(`No specific mime type supported, using fallback`);
     return 'video/webm'; // fallback
+  };
+  
+  const startRecording = () => {
+    if (isRecording || !streamRef.current) return;
+    
+    try {
+      chunksRef.current = [];
+      
+      const mimeType = getSupportedMimeType();
+      
+      const options: MediaRecorderOptions = {
+        mimeType: mimeType,
+        audioBitsPerSecond: 128000,
+        videoBitsPerSecond: 2500000
+      };
+      
+      const mediaRecorder = new MediaRecorder(streamRef.current, options);
+      mediaRecorderRef.current = mediaRecorder;
+      
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunksRef.current.push(e.data);
+        }
+      };
+      
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        setRecordedBlob(blob);
+        setVideoUrl(url);
+        
+        if (videoRef.current) {
+          videoRef.current.srcObject = null;
+          videoRef.current.src = url;
+          videoRef.current.controls = true;
+        }
+        
+        setIsFormVisible(true);
+      };
+      
+      mediaRecorder.start(1000);
+      setIsRecording(true);
+      setIsPaused(false);
+      
+      if (isMobile) {
+        requestFullscreen();
+      }
+      
+      timerRef.current = window.setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+      
+    } catch (error) {
+      console.error("Error starting recording:", error);
+      toast({
+        title: "Recording failed",
+        description: "Unable to start recording. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
   
   const pauseRecording = () => {
