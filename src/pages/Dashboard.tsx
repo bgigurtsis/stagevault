@@ -154,7 +154,7 @@ export default function Dashboard() {
         </div>
         <Input
           type="search"
-          placeholder="Search performances and recordings..."
+          placeholder="Search anything..."
           className="pl-10"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
