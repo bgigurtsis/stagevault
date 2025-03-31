@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, User, Check, AlertCircle, HardDrive } from "lucide-react";
@@ -8,10 +7,14 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuthContext";
 import { googleDriveService } from "@/services/googleDriveService";
-
 export default function Profile() {
-  const { currentUser, isLoading } = useAuth();
-  const { toast } = useToast();
+  const {
+    currentUser,
+    isLoading
+  } = useAuth();
+  const {
+    toast
+  } = useToast();
   const navigate = useNavigate();
   const [isCheckingDrive, setIsCheckingDrive] = useState(false);
   const [isDriveConnected, setIsDriveConnected] = useState<boolean | null>(null);
@@ -34,7 +37,6 @@ export default function Profile() {
   useEffect(() => {
     checkDriveConnection();
   }, []);
-
   const handleConnectDrive = async () => {
     try {
       toast({
@@ -51,17 +53,13 @@ export default function Profile() {
       });
     }
   };
-
   if (isLoading) {
     return <div className="container py-8">Loading profile...</div>;
   }
-
   if (!currentUser) {
     return <div className="container py-8">Please log in to view your profile.</div>;
   }
-
-  return (
-    <div className="container max-w-3xl py-6 space-y-6">
+  return <div className="container max-w-3xl py-6 space-y-6">
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-4 w-4" />
@@ -86,12 +84,10 @@ export default function Profile() {
             <p className="text-sm font-medium mb-1">Email</p>
             <p className="text-lg">{currentUser.email}</p>
           </div>
-          {currentUser.role && (
-            <div>
+          {currentUser.role && <div>
               <p className="text-sm font-medium mb-1">Role</p>
               <p className="text-lg capitalize">{currentUser.role}</p>
-            </div>
-          )}
+            </div>}
         </CardContent>
       </Card>
 
@@ -106,39 +102,28 @@ export default function Profile() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isCheckingDrive ? (
-            <div className="py-4">Checking connection status...</div>
-          ) : isDriveConnected ? (
-            <div className="flex items-center gap-2 py-2 text-green-600">
+          {isCheckingDrive ? <div className="py-4">Checking connection status...</div> : isDriveConnected ? <div className="flex items-center gap-2 py-2 text-green-600">
               <Check className="h-5 w-5" />
               <span className="font-medium">Connected to Google Drive</span>
-            </div>
-          ) : (
-            <div className="space-y-4">
+            </div> : <div className="space-y-4">
               <div className="flex items-start gap-2 py-2 text-amber-600">
                 <AlertCircle className="h-5 w-5 mt-0.5" />
                 <div>
-                  <span className="font-medium block">Google Drive Not Connected</span>
+                  <span className="font-medium block">Not Connected</span>
                   <span className="text-sm text-muted-foreground">
                     You need to connect Google Drive to create performances with folders and store recordings.
                   </span>
                 </div>
               </div>
-            </div>
-          )}
+            </div>}
         </CardContent>
         <CardFooter>
-          {isDriveConnected ? (
-            <Button variant="outline" onClick={checkDriveConnection}>
+          {isDriveConnected ? <Button variant="outline" onClick={checkDriveConnection}>
               Check Connection
-            </Button>
-          ) : (
-            <Button onClick={handleConnectDrive}>
+            </Button> : <Button onClick={handleConnectDrive}>
               Connect Google Drive
-            </Button>
-          )}
+            </Button>}
         </CardFooter>
       </Card>
-    </div>
-  );
+    </div>;
 }
