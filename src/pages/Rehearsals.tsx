@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, parseISO } from "date-fns";
-import { Plus, Calendar, MapPin } from "lucide-react";
+import { Plus, Calendar, MapPin, Users } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 export default function Rehearsals() {
   const [rehearsals, setRehearsals] = useState<Rehearsal[]>([]);
@@ -46,6 +47,52 @@ export default function Rehearsals() {
 
     fetchData();
   }, [toast]);
+
+  const getRehearsalStatus = (date: string | undefined) => {
+    if (!date) return "unscheduled";
+    
+    const now = new Date();
+    const rehearsalDate = new Date(date);
+    
+    if (rehearsalDate < now) return "past";
+    if (rehearsalDate.toDateString() === now.toDateString()) return "today";
+    return "upcoming";
+  };
+
+  const getStatusBadge = (date: string | undefined) => {
+    const status = getRehearsalStatus(date);
+    
+    switch (status) {
+      case "today":
+        return (
+          <Badge variant="default" className="bg-[#F2FCE2] text-[#2E7D32] border-[#F2FCE2] flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-[#2E7D32]"></span>
+            Today
+          </Badge>
+        );
+      case "upcoming":
+        return (
+          <Badge variant="outline" className="text-[#E65100] border-[#FEC6A1] flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-[#E65100]"></span>
+            Upcoming
+          </Badge>
+        );
+      case "past":
+        return (
+          <Badge variant="outline" className="text-[#B71C1C] border-[#ea384c] flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-[#B71C1C]"></span>
+            Past
+          </Badge>
+        );
+      default:
+        return (
+          <Badge variant="outline" className="text-[#4527A0] border-[#9b87f5] flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-[#4527A0]"></span>
+            Unscheduled
+          </Badge>
+        );
+    }
+  };
 
   if (loading) {
     return (
@@ -89,13 +136,16 @@ export default function Rehearsals() {
           {rehearsals.map((rehearsal) => (
             <Link key={rehearsal.id} to={`/rehearsals/${rehearsal.id}`}>
               <Card className="h-full transition-all hover:shadow-md">
-                <CardHeader>
-                  <CardTitle className="line-clamp-2">{rehearsal.title}</CardTitle>
+                <CardHeader className="pb-2">
+                  <div className="flex justify-between items-start">
+                    <CardTitle className="line-clamp-2">{rehearsal.title}</CardTitle>
+                    {getStatusBadge(rehearsal.date)}
+                  </div>
                   <CardDescription>
                     {performances[rehearsal.performanceId]?.title || "Unknown Performance"}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-2">
+                <CardContent className="space-y-2 pt-2">
                   <div className="flex items-center gap-2 text-sm">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span>
@@ -115,7 +165,8 @@ export default function Rehearsals() {
                   )}
                 </CardContent>
                 <CardFooter>
-                  <div className="w-full text-xs text-muted-foreground">
+                  <div className="w-full text-xs text-muted-foreground flex items-center gap-1">
+                    <Users className="h-3 w-3" />
                     {rehearsal.taggedUsers?.length ? (
                       <span>{rehearsal.taggedUsers.length} participants</span>
                     ) : (

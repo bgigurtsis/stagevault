@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -6,7 +5,6 @@ import {
   Theater, 
   Plus, 
   Search, 
-  Calendar, 
   MoreVertical,
   Edit,
   Trash,
@@ -21,7 +19,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   DropdownMenu,
   DropdownMenuContent, 
@@ -44,6 +41,8 @@ import { useAuth } from "@/hooks/useAuthContext";
 import { performanceService } from "@/services/performanceService";
 import { rehearsalService } from "@/services/rehearsalService";
 import { Performance } from "@/types";
+import { PerformanceStatusBadge } from "@/components/performance/PerformanceStatusBadge";
+import { PerformanceDate } from "@/components/performance/PerformanceDate";
 
 export default function Performances() {
   const { users, currentUser } = useAuth();
@@ -56,7 +55,6 @@ export default function Performances() {
   const [performanceToDelete, setPerformanceToDelete] = useState<Performance | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   
-  // Fetch performances from Supabase using React Query
   const { 
     data: performances = [], 
     isLoading: isLoadingPerformances, 
@@ -69,7 +67,6 @@ export default function Performances() {
     }
   });
   
-  // Fetch rehearsals to count them
   const { 
     data: rehearsals = [],
     isLoading: isLoadingRehearsals
@@ -80,7 +77,6 @@ export default function Performances() {
     }
   });
 
-  // Performance deletion mutation
   const deletePerformanceMutation = useMutation({
     mutationFn: async (performanceId: string) => {
       return await performanceService.deletePerformance(performanceId);
@@ -94,10 +90,8 @@ export default function Performances() {
         description: `"${performanceToDelete?.title}" has been deleted successfully.`,
       });
       
-      // Invalidate the performances query to refresh the data
       queryClient.invalidateQueries({ queryKey: ["performances"] });
       
-      // Reset state
       setPerformanceToDelete(null);
     },
     onError: (error) => {
@@ -112,15 +106,13 @@ export default function Performances() {
       setIsDeleting(false);
     },
   });
-  
-  // Filter performances based on search query
+
   const filteredPerformances = performances.filter(
     (performance) => 
       performance.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (performance.description && performance.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
   
-  // Sort performances by date
   const sortedPerformances = [...filteredPerformances].sort((a, b) => {
     if (!a.startDate || !b.startDate) return 0;
     const dateA = new Date(a.startDate).getTime();
@@ -141,23 +133,19 @@ export default function Performances() {
     });
   };
   
-  // Count rehearsals for each performance
   const getRehearsalCount = (performanceId: string) => {
     return rehearsals.filter(rehearsal => rehearsal.performanceId === performanceId).length;
   };
 
-  // Get user information from userId
   const getUserById = (userId: string) => {
     return users.find(user => user.id === userId) || null;
   };
   
-  // Handle performance deletion
   const handleDeletePerformance = async () => {
     if (!performanceToDelete) return;
     deletePerformanceMutation.mutate(performanceToDelete.id);
   };
 
-  // Handle errors
   const handleRetry = () => {
     refetchPerformances();
   };
@@ -205,7 +193,6 @@ export default function Performances() {
         </Link>
       </div>
       
-      {/* Search and Filter */}
       <div className="flex flex-col md:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -289,30 +276,29 @@ export default function Performances() {
                   <Theater className="h-12 w-12 text-muted-foreground/50" />
                 </div>
                 <CardContent className="p-4">
-                  <h3 className="text-lg font-semibold mb-1">{performance.title}</h3>
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="text-lg font-semibold">{performance.title}</h3>
+                    <PerformanceStatusBadge 
+                      startDate={performance.startDate} 
+                      endDate={performance.endDate} 
+                    />
+                  </div>
                   {performance.description && (
                     <p className="text-muted-foreground text-sm line-clamp-2 mb-3">{performance.description}</p>
                   )}
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground mt-2">
-                    <div className="flex items-center">
-                      <Calendar className="h-4 w-4 mr-1" />
-                      <span>{performance.startDate ? formatDate(performance.startDate) : "No date"}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <PlaySquare className="h-4 w-4 mr-1" />
+                  <div className="space-y-2 mt-2">
+                    <PerformanceDate 
+                      startDate={performance.startDate} 
+                      endDate={performance.endDate}
+                    />
+                    <div className="flex items-center text-sm text-muted-foreground">
+                      <PlaySquare className="h-4 w-4 mr-1.5 flex-shrink-0" />
                       <span>{getRehearsalCount(performance.id)} {getRehearsalCount(performance.id) === 1 ? "rehearsal" : "rehearsals"}</span>
                     </div>
                   </div>
                 </CardContent>
               </Link>
-              <CardFooter className="p-4 pt-0 flex items-center justify-between">
-                <div className="flex items-center text-sm text-muted-foreground">
-                  <Calendar className="h-4 w-4 mr-1" />
-                  <span>
-                    {formatDate(performance.startDate)}
-                    {performance.endDate && ` - ${formatDate(performance.endDate)}`}
-                  </span>
-                </div>
+              <CardFooter className="p-4 pt-0 flex items-center justify-end border-t mt-4">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isDeleting}>
@@ -340,7 +326,6 @@ export default function Performances() {
         </div>
       )}
       
-      {/* Delete confirmation dialog */}
       <AlertDialog open={!!performanceToDelete} onOpenChange={(open) => !open && setPerformanceToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
