@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { 
@@ -13,7 +14,6 @@ import {
   Clock,
   AlertCircle,
   Camera,
-  Bug,
   RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -42,7 +42,6 @@ import {
   DrawerDescription,
   DrawerHeader,
   DrawerTitle,
-  DrawerTrigger,
 } from "@/components/ui/drawer";
 import { useToast } from "@/hooks/use-toast";
 import { performanceService } from "@/services/performanceService";
@@ -74,10 +73,6 @@ export default function Record() {
   const [retryCount, setRetryCount] = useState(0);
   const [cameraAccessError, setCameraAccessError] = useState<string | null>(null);
   const [isInitializingCamera, setIsInitializingCamera] = useState(false);
-  const [debugMode, setDebugMode] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<Record<string, any>>({});
-  const [debugLogs, setDebugLogs] = useState<string[]>([]);
-  const [showDebugDialog, setShowDebugDialog] = useState(false);
   const [cameraAccessTimeout, setCameraAccessTimeout] = useState(10000);
   const [usingFallbackMode, setUsingFallbackMode] = useState(false);
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
@@ -98,17 +93,6 @@ export default function Record() {
     const timestamp = new Date().toISOString();
     const logMessage = `${timestamp} - ${message}`;
     console.log(logMessage, data);
-    
-    if (debugMode) {
-      setDebugLogs(prev => [...prev, data ? `${logMessage}: ${JSON.stringify(data)}` : logMessage]);
-      
-      if (data) {
-        setDebugInfo(prev => ({
-          ...prev,
-          [message]: data
-        }));
-      }
-    }
   };
   
   const enumerateDevices = async () => {
@@ -121,7 +105,7 @@ export default function Record() {
       setAvailableCameras(videoDevices);
       
       if (videoDevices.length > 0 && !selectedCameraId) {
-        setSelectedCameraId(videoDevices[0].deviceId || "default-camera");
+        setSelectedCameraId(videoDevices[0].deviceId || videoDevices[0].groupId || "default-camera");
         logDebug("Selected default camera", videoDevices[0].deviceId);
       }
       
@@ -181,7 +165,6 @@ export default function Record() {
     try {
       setCameraAccessError(null);
       setIsInitializingCamera(true);
-      setDebugLogs([]);
       
       logDebug("Starting camera initialization");
       
@@ -688,114 +671,6 @@ export default function Record() {
     );
   };
 
-  const DebugDialog = () => {
-    const isMobile = window.innerWidth < 768;
-    
-    const DebugContent = () => (
-      <div className="space-y-4 max-h-[70vh] overflow-auto">
-        <div className="space-y-2">
-          <h3 className="font-semibold">Camera Information</h3>
-          {availableCameras.length > 0 ? (
-            <div className="space-y-2">
-              <p className="text-sm">Detected {availableCameras.length} camera(s):</p>
-              <ul className="list-disc pl-5 text-sm space-y-1">
-                {availableCameras.map((camera, i) => (
-                  <li key={i} className={selectedCameraId === camera.deviceId ? "font-semibold" : ""}>
-                    {camera.label || `Camera ${i+1}`} 
-                    {selectedCameraId === camera.deviceId && " (selected)"}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : (
-            <p className="text-sm text-yellow-600">No cameras detected</p>
-          )}
-        </div>
-        
-        <div className="space-y-2">
-          <h3 className="font-semibold">Browser Information</h3>
-          <div className="text-sm space-y-1">
-            <p>Browser: {getBrowserName()}</p>
-            <p>User Agent: {navigator.userAgent}</p>
-            <p>Is Mobile: {/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? 'Yes' : 'No'}</p>
-            <p>Secure Context: {window.isSecureContext ? 'Yes' : 'No'}</p>
-            <p>MediaDevices API: {navigator.mediaDevices ? 'Available' : 'Not Available'}</p>
-            <p>MediaRecorder API: {typeof MediaRecorder !== 'undefined' ? 'Available' : 'Not Available'}</p>
-          </div>
-        </div>
-        
-        <div className="space-y-2">
-          <h3 className="font-semibold">Debug Settings</h3>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="timeout">Camera access timeout (ms):</Label>
-              <Input 
-                id="timeout" 
-                type="number" 
-                value={cameraAccessTimeout} 
-                onChange={(e) => setCameraAccessTimeout(Number(e.target.value))}
-                className="w-24" 
-                min={1000} 
-                max={60000} 
-                step={1000}
-              />
-            </div>
-            
-            <Button onClick={() => enumerateDevices()} variant="outline" size="sm">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh device list
-            </Button>
-          </div>
-        </div>
-        
-        <div className="space-y-2">
-          <h3 className="font-semibold">Debug Log</h3>
-          <div className="bg-slate-100 dark:bg-slate-900 p-2 rounded-md h-40 overflow-y-auto text-xs font-mono">
-            {debugLogs.length > 0 ? (
-              debugLogs.map((log, i) => (
-                <div key={i} className="pb-1">{log}</div>
-              ))
-            ) : (
-              <p className="text-muted-foreground">No logs yet</p>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-    
-    if (isMobile) {
-      return (
-        <Drawer open={showDebugDialog} onOpenChange={setShowDebugDialog}>
-          <DrawerContent>
-            <DrawerHeader>
-              <DrawerTitle>Camera Debug Information</DrawerTitle>
-              <DrawerDescription>
-                Technical details to help diagnose camera issues
-              </DrawerDescription>
-            </DrawerHeader>
-            <div className="px-4 pb-4">
-              <DebugContent />
-            </div>
-          </DrawerContent>
-        </Drawer>
-      );
-    }
-    
-    return (
-      <Dialog open={showDebugDialog} onOpenChange={setShowDebugDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Camera Debug Information</DialogTitle>
-            <DialogDescription>
-              Technical details to help diagnose camera issues
-            </DialogDescription>
-          </DialogHeader>
-          <DebugContent />
-        </DialogContent>
-      </Dialog>
-    );
-  };
-
   useEffect(() => {
     checkBrowserCompatibility();
     enumerateDevices();
@@ -889,22 +764,6 @@ export default function Record() {
           </h1>
         </div>
         <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            size="icon"
-            onClick={() => {
-              setDebugMode(!debugMode);
-              setShowDebugDialog(!debugMode);
-            }}
-            className="relative"
-            title="Debug mode"
-          >
-            <Bug className="h-4 w-4" />
-            {debugMode && (
-              <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-green-500"></span>
-            )}
-          </Button>
-          
           {recordedBlob && (
             <>
               <Button variant="outline" onClick={resetRecording} disabled={isUploading}>
@@ -937,8 +796,6 @@ export default function Record() {
           )}
         </div>
       </div>
-      
-      {debugMode && <DebugDialog />}
       
       {isUploading && (
         <div className="bg-background border rounded-md p-4 space-y-3">
@@ -1045,7 +902,8 @@ export default function Record() {
                       </SelectTrigger>
                       <SelectContent>
                         {availableCameras.map((camera) => (
-                          <SelectItem key={camera.deviceId} value={camera.deviceId || `camera-${camera.groupId}`}>
+                          <SelectItem key={camera.deviceId || camera.groupId} 
+                                      value={camera.deviceId || camera.groupId || `camera-${camera.groupId}`}>
                             {camera.label || `Camera ${camera.deviceId ? camera.deviceId.substring(0, 5) : "Default"}`}
                           </SelectItem>
                         ))}
@@ -1066,12 +924,6 @@ export default function Record() {
                   <p className="text-sm text-muted-foreground mt-1">
                     Please allow camera access when prompted
                   </p>
-                  {debugMode && (
-                    <p className="text-xs text-muted-foreground mt-3">
-                      Timeout: {cameraAccessTimeout/1000}s | 
-                      Selected camera: {selectedCameraId ? selectedCameraId.substring(0, 8) + '...' : 'default'}
-                    </p>
-                  )}
                 </div>
               </div>
             )}
@@ -1097,11 +949,6 @@ export default function Record() {
                         <Button variant="outline" size="sm" onClick={attemptScreenshareWithCamera}>
                           Try Screen Share
                         </Button>
-                        {debugMode && (
-                          <Button variant="outline" size="sm" onClick={() => setShowDebugDialog(true)}>
-                            <Bug className="h-3 w-3 mr-1" /> Debug Info
-                          </Button>
-                        )}
                         <p className="text-xs text-muted-foreground mt-1 w-full">
                           Make sure your camera is connected and you've allowed browser permissions
                         </p>
