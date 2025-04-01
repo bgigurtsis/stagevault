@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import GeoPattern, { GeneratorType } from 'geopattern';
 import { cn } from '@/lib/utils';
@@ -9,21 +10,16 @@ interface PerformanceThumbnailProps {
   patternType?: GeneratorType | GeneratorType[];
 }
 
-const generateRandomString = (length: number): string => {
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-};
-
 export const PerformanceThumbnail: React.FC<PerformanceThumbnailProps> = ({ 
   title, 
   className = "",
   fallbackIcon = false,
   patternType
 }) => {
+  // Use consistent seed for pattern generation to ensure it doesn't change on refresh
+  // We'll use just the title as the seed so it stays consistent
+  const patternSeed = title;
+
   // Select a pattern type to use
   const selectedPatternType = useMemo(() => {
     if (!patternType) {
@@ -31,18 +27,17 @@ export const PerformanceThumbnail: React.FC<PerformanceThumbnailProps> = ({
     }
     
     if (Array.isArray(patternType)) {
-      // If it's an array, randomly select one pattern type
-      return patternType[Math.floor(Math.random() * patternType.length)];
+      // If it's an array, use a deterministic selection based on the title
+      const titleHash = title.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+      return patternType[titleHash % patternType.length];
     }
     
     // If it's a single pattern type, use it
     return patternType;
-  }, [patternType]);
+  }, [patternType, title]);
 
-  // Combine title with random string to enhance randomness
-  const patternInput = `${title}-${generateRandomString(8)}`;
-
-  const pattern = GeoPattern.generate(patternInput, {
+  // Generate pattern using just the title as seed, instead of random elements
+  const pattern = GeoPattern.generate(patternSeed, {
     baseColor: '#9b87f5',
     generator: selectedPatternType
   });

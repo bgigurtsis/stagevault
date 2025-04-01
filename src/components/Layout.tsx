@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, Outlet, useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuthContext";
-import { Home, User, LogOut, Menu, X, Plus, Theater, Video } from "lucide-react";
+import { Home, User, LogOut, Menu, X, Plus, Theater, Video, Calendar, Film } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -47,6 +47,16 @@ export default function Layout() {
       path: "/performances",
       icon: <Theater className="h-5 w-5" />,
       label: "Performances"
+    },
+    {
+      path: "/rehearsals",
+      icon: <Calendar className="h-5 w-5" />,
+      label: "Rehearsals"
+    },
+    {
+      path: "/recordings",
+      icon: <Film className="h-5 w-5" />,
+      label: "Recordings"
     },
     {
       path: "/profile",
@@ -200,7 +210,7 @@ export default function Layout() {
         
         <nav className="md:hidden border-t bg-background">
           <div className="flex justify-between">
-            {navItems.map(item => <Link key={item.path} to={item.path} className={`flex flex-1 flex-col items-center py-2 px-1 ${isLinkActive(item.path) ? "text-primary" : "text-muted-foreground"}`}>
+            {navItems.slice(0, 3).map(item => <Link key={item.path} to={item.path} className={`flex flex-1 flex-col items-center py-2 px-1 ${isLinkActive(item.path) ? "text-primary" : "text-muted-foreground"}`}>
                 {item.icon}
                 <span className="text-xs mt-1">{item.label}</span>
               </Link>)}

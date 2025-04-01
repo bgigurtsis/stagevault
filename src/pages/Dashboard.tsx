@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from 'date-fns';
-import { ChevronRight, Video, Calendar, ListChecks } from "lucide-react";
+import { ChevronRight, User, LogOut, Menu, X, Plus, Theater, Video, Calendar, ListChecks } from "lucide-react";
 
 export default function Dashboard() {
   const [performances, setPerformances] = useState<Performance[]>([]);
