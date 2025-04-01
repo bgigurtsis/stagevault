@@ -1,4 +1,3 @@
-
 import React from 'react';
 import GeoPattern from 'geopattern';
 import { cn } from '@/lib/utils';
@@ -9,14 +8,25 @@ interface PerformanceThumbnailProps {
   fallbackIcon?: boolean;
 }
 
+const generateRandomString = (length: number): string => {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+};
+
 export const PerformanceThumbnail: React.FC<PerformanceThumbnailProps> = ({ 
   title, 
   className = "",
-  fallbackIcon = false // Changed default to false
+  fallbackIcon = false
 }) => {
-  // Generate pattern based on the performance title
-  const pattern = GeoPattern.generate(title, {
-    baseColor: '#9b87f5' // Using a purple base color that matches the app theme
+  // Combine title with random string to enhance randomness
+  const patternInput = `${title}-${generateRandomString(8)}`;
+
+  const pattern = GeoPattern.generate(patternInput, {
+    baseColor: '#9b87f5'
   });
   
   return (
