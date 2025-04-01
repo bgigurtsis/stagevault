@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { googleDriveService } from "@/services/googleDriveService";
 import { recordingService } from "@/services/recordingService";
 import { useNavigate } from "react-router-dom";
+import { CreateRecordingData } from "@/services/recordingService";
 
 export type UploadPhase = 'preparing' | 'uploading' | 'processing' | 'saving' | 'complete' | 'error';
 
@@ -150,7 +151,7 @@ export const useUpload = ({ recordingTime }: UseUploadProps) => {
       console.log("Processed tags:", tagsArray);
       
       // Save to database
-      const savedRecording = await recordingService.createRecording({
+      const recordingData: CreateRecordingData = {
         rehearsalId: selectedRehearsal,
         title: title,
         notes: notes || undefined,
@@ -159,7 +160,9 @@ export const useUpload = ({ recordingTime }: UseUploadProps) => {
         videoUrl: driveFile.webViewLink,
         thumbnailUrl: driveFile.thumbnailLink,
         googleFileId: driveFile.id
-      });
+      };
+      
+      const savedRecording = await recordingService.createRecording(recordingData);
       
       console.log("Recording saved to database:", savedRecording);
       setUploadPhase('complete');

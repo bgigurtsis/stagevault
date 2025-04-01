@@ -1,12 +1,43 @@
-import { Recording } from "@/types";
-import { dataService } from "@/utils/dataService";
 
-const getRecentRecordings = async (limit: number): Promise<Recording[]> => {
+import { Recording } from "@/types";
+import { dataService } from "../services/dataService";
+
+export interface CreateRecordingData {
+  rehearsalId: string;
+  title: string;
+  notes?: string;
+  tags?: string[];
+  duration?: number;
+  videoUrl?: string;
+  thumbnailUrl?: string;
+  googleFileId?: string;
+}
+
+export interface UpdateRecordingData {
+  id: string;
+  title?: string;
+  notes?: string;
+  tags?: string[];
+  videoUrl?: string;
+  thumbnailUrl?: string;
+}
+
+const getRecentRecordings = async (limit: number = 5): Promise<Recording[]> => {
   try {
     const response = await dataService.get<Recording[]>(`/recordings?_sort=createdAt:DESC&_limit=${limit}`);
     return response || [];
   } catch (error) {
     console.error("Error fetching recent recordings:", error);
+    return [];
+  }
+};
+
+const getRecordingsByRehearsalId = async (rehearsalId: string): Promise<Recording[]> => {
+  try {
+    const response = await dataService.get<Recording[]>(`/recordings?rehearsalId=${rehearsalId}`);
+    return response || [];
+  } catch (error) {
+    console.error(`Error fetching recordings for rehearsal ${rehearsalId}:`, error);
     return [];
   }
 };
@@ -21,9 +52,9 @@ const getRecordingById = async (id: string): Promise<Recording | null> => {
   }
 };
 
-const createRecording = async (recording: Recording): Promise<Recording | null> => {
+const createRecording = async (recordingData: CreateRecordingData): Promise<Recording | null> => {
   try {
-    const response = await dataService.post<Recording>('/recordings', recording);
+    const response = await dataService.post<Recording>('/recordings', recordingData);
     return response || null;
   } catch (error) {
     console.error('Error creating recording:', error);
@@ -31,9 +62,9 @@ const createRecording = async (recording: Recording): Promise<Recording | null> 
   }
 };
 
-const updateRecording = async (id: string, recording: Recording): Promise<Recording | null> => {
+const updateRecording = async (id: string, recordingData: UpdateRecordingData): Promise<Recording | null> => {
   try {
-    const response = await dataService.put<Recording>(`/recordings/${id}`, recording);
+    const response = await dataService.put<Recording>(`/recordings/${id}`, recordingData);
     return response || null;
   } catch (error) {
     console.error(`Error updating recording with ID ${id}:`, error);
@@ -57,6 +88,7 @@ export const recordingService = {
   createRecording,
   updateRecording,
   deleteRecording,
+  getRecordingsByRehearsalId,
 
   getAllRecordings: async (): Promise<Recording[]> => {
     try {

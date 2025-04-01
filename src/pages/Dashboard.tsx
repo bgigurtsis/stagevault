@@ -30,17 +30,17 @@ export default function Dashboard() {
             Math.floor(Math.random() * 11);
             
           const patternTypes = [
-            "chevrons",
-            "octogons",
-            "overlappingCircles",
-            "plusSigns",
-            "xes", 
-            "hexagons",
-            "overlappingRings",
-            "nestedSquares",
-            "mosaicSquares",
-            "diamonds",
-            "tessellation"
+            "chevrons" as const,
+            "octogons" as const,
+            "overlappingCircles" as const,
+            "plusSigns" as const,
+            "xes" as const, 
+            "hexagons" as const,
+            "overlappingRings" as const,
+            "nestedSquares" as const,
+            "mosaicSquares" as const,
+            "diamonds" as const,
+            "tessellation" as const
           ];
           
           return {

@@ -1,6 +1,6 @@
 
 import { BaseService } from "./baseService";
-import { Performance } from "@/types";
+import { Performance, PerformanceStatus } from "@/types";
 import { googleDriveService } from "./googleDriveService";
 
 export interface CreatePerformanceData {
@@ -10,6 +10,8 @@ export interface CreatePerformanceData {
   endDate?: string;
   taggedUsers?: string[];
   createdBy: string;
+  status?: PerformanceStatus;
+  userId: string;
 }
 
 export interface UpdatePerformanceData extends Partial<CreatePerformanceData> {
@@ -38,7 +40,10 @@ export class PerformanceService extends BaseService {
       updatedAt: p.updated_at,
       createdBy: p.created_by,
       taggedUsers: p.tagged_users || [],
-      driveFolderId: p.drive_folder_id || undefined
+      driveFolderId: p.drive_folder_id || undefined,
+      status: (p.status as PerformanceStatus) || "upcoming",
+      userId: p.created_by, // Using created_by as userId for compatibility
+      coverImage: p.cover_image
     }));
   }
   
@@ -73,7 +78,10 @@ export class PerformanceService extends BaseService {
       updatedAt: data.updated_at,
       createdBy: data.created_by,
       taggedUsers: data.tagged_users || [],
-      driveFolderId: data.drive_folder_id || undefined
+      driveFolderId: data.drive_folder_id || undefined,
+      status: (data.status as PerformanceStatus) || "upcoming",
+      userId: data.created_by, // Using created_by as userId for compatibility
+      coverImage: data.cover_image
     };
   }
   
@@ -108,7 +116,9 @@ export class PerformanceService extends BaseService {
           end_date: performanceData.endDate,
           tagged_users: performanceData.taggedUsers,
           created_by: performanceData.createdBy,
-          drive_folder_id: driveFolderId
+          drive_folder_id: driveFolderId,
+          status: performanceData.status || "upcoming",
+          user_id: performanceData.userId
         })
         .select()
         .single();
@@ -130,7 +140,10 @@ export class PerformanceService extends BaseService {
         updatedAt: data.updated_at,
         createdBy: data.created_by,
         taggedUsers: data.tagged_users || [],
-        driveFolderId: data.drive_folder_id || undefined
+        driveFolderId: data.drive_folder_id || undefined,
+        status: (data.status as PerformanceStatus) || "upcoming",
+        userId: data.created_by, // Using created_by as userId for compatibility
+        coverImage: data.cover_image
       };
     } catch (error) {
       console.error("Unexpected error during performance creation:", error);
@@ -146,6 +159,8 @@ export class PerformanceService extends BaseService {
     if (performanceData.startDate !== undefined) updateData.start_date = performanceData.startDate;
     if (performanceData.endDate !== undefined) updateData.end_date = performanceData.endDate;
     if (performanceData.taggedUsers !== undefined) updateData.tagged_users = performanceData.taggedUsers;
+    if (performanceData.status !== undefined) updateData.status = performanceData.status;
+    if (performanceData.userId !== undefined) updateData.user_id = performanceData.userId;
     
     const { data, error } = await this.supabase
       .from("performances")
@@ -169,7 +184,10 @@ export class PerformanceService extends BaseService {
       updatedAt: data.updated_at,
       createdBy: data.created_by,
       taggedUsers: data.tagged_users || [],
-      driveFolderId: data.drive_folder_id || undefined
+      driveFolderId: data.drive_folder_id || undefined,
+      status: (data.status as PerformanceStatus) || "upcoming",
+      userId: data.created_by, // Using created_by as userId for compatibility
+      coverImage: data.cover_image
     };
   }
   
