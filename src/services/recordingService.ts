@@ -1,30 +1,10 @@
 
 import { Recording } from "@/types";
-import { dataService } from "../services/dataService";
+import { dataService } from "./dataService";
 
-export interface CreateRecordingData {
-  rehearsalId: string;
-  title: string;
-  notes?: string;
-  tags?: string[];
-  duration?: number;
-  videoUrl?: string;
-  thumbnailUrl?: string;
-  googleFileId?: string;
-}
-
-export interface UpdateRecordingData {
-  id: string;
-  title?: string;
-  notes?: string;
-  tags?: string[];
-  videoUrl?: string;
-  thumbnailUrl?: string;
-}
-
-const getRecentRecordings = async (limit: number = 5): Promise<Recording[]> => {
+const getRecentRecordings = async (limit: number = 3): Promise<Recording[]> => {
   try {
-    const response = await dataService.get<Recording[]>(`/recordings?_sort=createdAt:DESC&_limit=${limit}`);
+    const response = await dataService.get(`/recordings?_sort=createdAt:DESC&_limit=${limit}`);
     return response || [];
   } catch (error) {
     console.error("Error fetching recent recordings:", error);
@@ -32,19 +12,9 @@ const getRecentRecordings = async (limit: number = 5): Promise<Recording[]> => {
   }
 };
 
-const getRecordingsByRehearsalId = async (rehearsalId: string): Promise<Recording[]> => {
-  try {
-    const response = await dataService.get<Recording[]>(`/recordings?rehearsalId=${rehearsalId}`);
-    return response || [];
-  } catch (error) {
-    console.error(`Error fetching recordings for rehearsal ${rehearsalId}:`, error);
-    return [];
-  }
-};
-
 const getRecordingById = async (id: string): Promise<Recording | null> => {
   try {
-    const response = await dataService.get<Recording>(`/recordings/${id}`);
+    const response = await dataService.get(`/recordings/${id}`);
     return response || null;
   } catch (error) {
     console.error(`Error fetching recording with ID ${id}:`, error);
@@ -52,9 +22,20 @@ const getRecordingById = async (id: string): Promise<Recording | null> => {
   }
 };
 
-const createRecording = async (recordingData: CreateRecordingData): Promise<Recording | null> => {
+// Add the missing getRecordingsByRehearsalId function
+const getRecordingsByRehearsalId = async (rehearsalId: string): Promise<Recording[]> => {
   try {
-    const response = await dataService.post<Recording>('/recordings', recordingData);
+    const response = await dataService.get(`/recordings?rehearsalId=${rehearsalId}`);
+    return Array.isArray(response) ? response : [];
+  } catch (error) {
+    console.error(`Error fetching recordings for rehearsal ${rehearsalId}:`, error);
+    return [];
+  }
+};
+
+const createRecording = async (recording: Recording): Promise<Recording | null> => {
+  try {
+    const response = await dataService.post('/recordings', recording);
     return response || null;
   } catch (error) {
     console.error('Error creating recording:', error);
@@ -62,9 +43,9 @@ const createRecording = async (recordingData: CreateRecordingData): Promise<Reco
   }
 };
 
-const updateRecording = async (id: string, recordingData: UpdateRecordingData): Promise<Recording | null> => {
+const updateRecording = async (id: string, recording: Partial<Recording>): Promise<Recording | null> => {
   try {
-    const response = await dataService.put<Recording>(`/recordings/${id}`, recordingData);
+    const response = await dataService.put(`/recordings/${id}`, recording);
     return response || null;
   } catch (error) {
     console.error(`Error updating recording with ID ${id}:`, error);
@@ -82,21 +63,22 @@ const deleteRecording = async (id: string): Promise<boolean> => {
   }
 };
 
+const getAllRecordings = async (): Promise<Recording[]> => {
+  try {
+    const response = await dataService.get('/recordings');
+    return response || [];
+  } catch (error) {
+    console.error('Error fetching all recordings:', error);
+    return [];
+  }
+};
+
 export const recordingService = {
   getRecentRecordings,
   getRecordingById,
   createRecording,
   updateRecording,
   deleteRecording,
-  getRecordingsByRehearsalId,
-
-  getAllRecordings: async (): Promise<Recording[]> => {
-    try {
-      const response = await dataService.get<Recording[]>('/recordings');
-      return response || [];
-    } catch (error) {
-      console.error('Error fetching all recordings:', error);
-      return [];
-    }
-  },
+  getAllRecordings,
+  getRecordingsByRehearsalId
 };

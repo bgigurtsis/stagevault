@@ -1,233 +1,73 @@
-
-import { BaseService } from "./baseService";
 import { Rehearsal } from "@/types";
-import { googleDriveService } from "./googleDriveService";
+import { dataService } from "./dataService";
 
-export interface CreateRehearsalData {
-  title: string;
-  description?: string;
-  date: string;
-  location?: string;
-  notes?: string;
-  performanceId: string;
-  taggedUsers?: string[];
-}
+// Add a getRecentRehearsals method that Dashboard.tsx is trying to use
+const getRecentRehearsals = async (limit: number = 3): Promise<Rehearsal[]> => {
+  try {
+    const response = await dataService.get(`/rehearsals?_sort=date:DESC&_limit=${limit}`);
+    return Array.isArray(response) ? response : [];
+  } catch (error) {
+    console.error("Error fetching recent rehearsals:", error);
+    return [];
+  }
+};
 
-export interface UpdateRehearsalData extends Partial<CreateRehearsalData> {
-  id: string;
-}
+// Assuming there's an existing getRehearsals method that needs to be kept
+const getRehearsals = async (): Promise<Rehearsal[]> => {
+  try {
+    const response = await dataService.get("/rehearsals");
+    return Array.isArray(response) ? response : [];
+  } catch (error) {
+    console.error("Error fetching rehearsals:", error);
+    return [];
+  }
+};
 
-export class RehearsalService extends BaseService {
-  async getRehearsals(): Promise<Rehearsal[]> {
-    const { data, error } = await this.supabase
-      .from("rehearsals")
-      .select("*")
-      .order("date", { ascending: false });
-    
-    if (error) {
-      console.error("Error fetching rehearsals:", error);
-      return [];
-    }
-    
-    return data.map(r => ({
-      id: r.id,
-      title: r.title,
-      description: r.description || undefined,
-      date: r.date,
-      location: r.location || undefined,
-      notes: r.notes || undefined,
-      performanceId: r.performance_id,
-      createdAt: r.created_at,
-      updatedAt: r.updated_at,
-      taggedUsers: r.tagged_users || [],
-      driveFolderId: r.drive_folder_id || undefined
-    }));
+const getRehearsalById = async (id: string): Promise<Rehearsal | null> => {
+  try {
+    const response = await dataService.get(`/rehearsals/${id}`);
+    return response || null;
+  } catch (error) {
+    console.error(`Error fetching rehearsal with ID ${id}:`, error);
+    return null;
   }
-  
-  async getRehearsalById(id: string): Promise<Rehearsal | null> {
-    const { data, error } = await this.supabase
-      .from("rehearsals")
-      .select("*")
-      .eq("id", id)
-      .single();
-    
-    if (error) {
-      console.error("Error fetching rehearsal:", error);
-      return null;
-    }
-    
-    return {
-      id: data.id,
-      title: data.title,
-      description: data.description || undefined,
-      date: data.date,
-      location: data.location || undefined,
-      notes: data.notes || undefined,
-      performanceId: data.performance_id,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-      taggedUsers: data.tagged_users || [],
-      driveFolderId: data.drive_folder_id || undefined
-    };
+};
+
+const createRehearsal = async (rehearsal: Rehearsal): Promise<Rehearsal | null> => {
+  try {
+    const response = await dataService.post('/rehearsals', rehearsal);
+    return response || null;
+  } catch (error) {
+    console.error('Error creating rehearsal:', error);
+    return null;
   }
-  
-  async getRehearsalsByPerformance(performanceId: string): Promise<Rehearsal[]> {
-    const { data, error } = await this.supabase
-      .from("rehearsals")
-      .select("*")
-      .eq("performance_id", performanceId)
-      .order("date", { ascending: false });
-    
-    if (error) {
-      console.error("Error fetching rehearsals by performance:", error);
-      return [];
-    }
-    
-    return data.map(r => ({
-      id: r.id,
-      title: r.title,
-      description: r.description || undefined,
-      date: r.date,
-      location: r.location || undefined,
-      notes: r.notes || undefined,
-      performanceId: r.performance_id,
-      createdAt: r.created_at,
-      updatedAt: r.updated_at,
-      taggedUsers: r.tagged_users || [],
-      driveFolderId: r.drive_folder_id || undefined
-    }));
+};
+
+const updateRehearsal = async (id: string, rehearsal: Partial<Rehearsal>): Promise<Rehearsal | null> => {
+  try {
+    const response = await dataService.put(`/rehearsals/${id}`, rehearsal);
+    return response || null;
+  } catch (error) {
+    console.error(`Error updating rehearsal with ID ${id}:`, error);
+    return null;
   }
-  
-  async createRehearsal(rehearsalData: CreateRehearsalData): Promise<Rehearsal | null> {
-    try {
-      // Create folder in Google Drive if performance has a drive folder
-      let driveFolderId: string | null = null;
-      
-      if (rehearsalData.performanceId) {
-        try {
-          const { data: performance } = await this.supabase
-            .from("performances")
-            .select("drive_folder_id, title")
-            .eq("id", rehearsalData.performanceId)
-            .single();
-          
-          if (performance?.drive_folder_id) {
-            driveFolderId = await googleDriveService.createRehearsalFolder(
-              rehearsalData.title,
-              performance.drive_folder_id,
-              performance.title
-            );
-          }
-        } catch (error) {
-          console.error("Error creating Google Drive folder for rehearsal:", error);
-          // Continue with DB insert even if folder creation fails
-        }
-      }
-      
-      // Insert rehearsal into database
-      const { data, error } = await this.supabase
-        .from("rehearsals")
-        .insert({
-          title: rehearsalData.title,
-          description: rehearsalData.description,
-          date: rehearsalData.date,
-          location: rehearsalData.location,
-          notes: rehearsalData.notes,
-          performance_id: rehearsalData.performanceId,
-          tagged_users: rehearsalData.taggedUsers,
-          drive_folder_id: driveFolderId
-        })
-        .select()
-        .single();
-      
-      if (error) {
-        console.error("Error creating rehearsal:", error);
-        return null;
-      }
-      
-      return {
-        id: data.id,
-        title: data.title,
-        description: data.description || undefined,
-        date: data.date,
-        location: data.location || undefined,
-        notes: data.notes || undefined,
-        performanceId: data.performance_id,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-        taggedUsers: data.tagged_users || [],
-        driveFolderId: data.drive_folder_id || undefined
-      };
-    } catch (error) {
-      console.error("Unexpected error during rehearsal creation:", error);
-      return null;
-    }
-  }
-  
-  async updateRehearsal(rehearsalData: UpdateRehearsalData): Promise<Rehearsal | null> {
-    const updateData: any = {};
-    
-    if (rehearsalData.title !== undefined) updateData.title = rehearsalData.title;
-    if (rehearsalData.description !== undefined) updateData.description = rehearsalData.description;
-    if (rehearsalData.date !== undefined) updateData.date = rehearsalData.date;
-    if (rehearsalData.location !== undefined) updateData.location = rehearsalData.location;
-    if (rehearsalData.notes !== undefined) updateData.notes = rehearsalData.notes;
-    if (rehearsalData.performanceId !== undefined) updateData.performance_id = rehearsalData.performanceId;
-    if (rehearsalData.taggedUsers !== undefined) updateData.tagged_users = rehearsalData.taggedUsers;
-    
-    const { data, error } = await this.supabase
-      .from("rehearsals")
-      .update(updateData)
-      .eq("id", rehearsalData.id)
-      .select()
-      .single();
-    
-    if (error) {
-      console.error("Error updating rehearsal:", error);
-      return null;
-    }
-    
-    return {
-      id: data.id,
-      title: data.title,
-      description: data.description || undefined,
-      date: data.date,
-      location: data.location || undefined,
-      notes: data.notes || undefined,
-      performanceId: data.performance_id,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-      taggedUsers: data.tagged_users || [],
-      driveFolderId: data.drive_folder_id || undefined
-    };
-  }
-  
-  async deleteRehearsal(id: string): Promise<boolean> {
-    // Get rehearsal to check for Drive folder
-    const rehearsal = await this.getRehearsalById(id);
-    
-    if (rehearsal?.driveFolderId) {
-      // Try to delete the Google Drive folder
-      try {
-        await googleDriveService.deleteFolder(rehearsal.driveFolderId);
-      } catch (error) {
-        console.error("Error deleting Google Drive folder for rehearsal:", error);
-        // Continue with database deletion even if folder deletion fails
-      }
-    }
-    
-    const { error } = await this.supabase
-      .from("rehearsals")
-      .delete()
-      .eq("id", id);
-    
-    if (error) {
-      console.error("Error deleting rehearsal:", error);
-      return false;
-    }
-    
+};
+
+const deleteRehearsal = async (id: string): Promise<boolean> => {
+  try {
+    await dataService.delete(`/rehearsals/${id}`);
     return true;
+  } catch (error) {
+    console.error(`Error deleting rehearsal with ID ${id}:`, error);
+    return false;
   }
-}
+};
 
-export const rehearsalService = new RehearsalService();
+export const rehearsalService = {
+  getRehearsals,
+  getRecentRehearsals,
+  getRehearsalById,
+  createRehearsal,
+  updateRehearsal,
+  deleteRehearsal,
+};

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar, Clock, ListVideo, Music, PlaySquare, Video } from "lucide-react";
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from "@/components/ui/skeleton";
-import { useUser } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 import geoPattern from 'geopattern';
 
 export default function Dashboard() {
@@ -17,13 +17,13 @@ export default function Dashboard() {
   const [rehearsals, setRehearsals] = useState<Rehearsal[]>([]);
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user } = useUser();
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const performanceData = await performanceService.getPerformances();
-        const rehearsalData = await rehearsalService.getRecentRehearsals();
+        const rehearsalData = await rehearsalService.getRehearsals();
         const recordingData = await recordingService.getRecentRecordings();
 
         setPerformances(performanceData);
@@ -125,8 +125,7 @@ export default function Dashboard() {
             ) : (
               performances.map((performance) => {
                 const pattern = geoPattern.generate(performance.title, {
-                  baseColor: "#2a6b9c",
-                  generator: "squares" as any
+                  baseColor: "#2a6b9c"
                 }).toString();
 
                 return (
@@ -150,7 +149,7 @@ export default function Dashboard() {
               })
             )}
             {user && (
-              <Link to="/performance">
+              <Link to="/performances/new">
                 <Button variant="link" className="w-full justify-start">
                   <PlaySquare className="mr-2 h-4 w-4" />
                   Create Performance

@@ -102,19 +102,19 @@ const createPerformance = async (performanceData: CreatePerformanceData): Promis
     console.log("Created performance:", response);
     
     // Create Google Drive folder for the performance
-    if (response.id) {
+    if (response && typeof response === 'object' && 'id' in response) {
       try {
-        const folderResponse = await googleDriveService.createPerformanceFolder(response.title);
-        if (folderResponse?.id) {
+        const folderResponse = await googleDriveService.createPerformanceFolder(response.title as string);
+        if (folderResponse && typeof folderResponse === 'object' && 'id' in folderResponse) {
           // Update performance with the folder ID
-          const updateResponse = await dataService.put(`/performances/${response.id}`, {
+          const updateResponse = await dataService.put(`/performances/${response.id as string}`, {
             drive_folder_id: folderResponse.id
           });
           console.log("Updated performance with Drive folder ID:", updateResponse);
           
           // If successful update, update our response object
-          if (updateResponse) {
-            response.drive_folder_id = folderResponse.id;
+          if (updateResponse && typeof updateResponse === 'object') {
+            (response as any).drive_folder_id = folderResponse.id;
           }
         }
       } catch (driveError) {
@@ -123,7 +123,7 @@ const createPerformance = async (performanceData: CreatePerformanceData): Promis
       }
     }
     
-    return transformPerformanceData(response);
+    return transformPerformanceData(response as any);
   } catch (error) {
     console.error("Error creating performance:", error);
     return null;

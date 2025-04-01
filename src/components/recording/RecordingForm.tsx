@@ -217,8 +217,8 @@ export function RecordingForm({
   }, [selectedPerformance, selectedRehearsal]);
 
   // Enhanced create performance function with better error handling
-  const createPerformanceHandler = async () => {
-    e?.preventDefault();
+  const createPerformanceHandler = async (e: React.FormEvent) => {
+    e.preventDefault();
     
     if (!newPerformanceTitle.trim()) {
       toast({
@@ -279,8 +279,8 @@ export function RecordingForm({
   };
   
   // Enhanced create rehearsal function with better error handling
-  const handleCreateRehearsal = async (e?: React.MouseEvent) => {
-    e?.preventDefault();
+  const handleCreateRehearsal = async (e: React.FormEvent) => {
+    e.preventDefault();
     
     if (!selectedPerformance) {
       toast({
