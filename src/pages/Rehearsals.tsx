@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -14,29 +15,37 @@ import { Badge } from "@/components/ui/badge";
 export default function Rehearsals() {
   const [rehearsals, setRehearsals] = useState<Rehearsal[]>([]);
   const [performances, setPerformances] = useState<Record<string, Performance>>({});
-  const [loading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    const fetchRehearsals = async () => {
+    const fetchData = async () => {
       try {
-        setIsLoading(true);
-        const rehearsalsData = await rehearsalService.getRehearsals();
+        // Fetch all rehearsals
+        const rehearsalsData = await rehearsalService.getAllRehearsals();
         setRehearsals(rehearsalsData);
+
+        // Fetch all performances to map them to rehearsals
+        const performancesData = await performanceService.getPerformances();
+        const performancesMap: Record<string, Performance> = {};
+        performancesData.forEach(performance => {
+          performancesMap[performance.id] = performance;
+        });
+        setPerformances(performancesMap);
       } catch (error) {
-        console.error("Error fetching rehearsals:", error);
+        console.error("Error fetching data:", error);
         toast({
           title: "Error",
           description: "Failed to load rehearsals. Please try again.",
           variant: "destructive",
         });
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
 
-    fetchRehearsals();
+    fetchData();
   }, [toast]);
 
   const getRehearsalStatus = (date: string | undefined) => {

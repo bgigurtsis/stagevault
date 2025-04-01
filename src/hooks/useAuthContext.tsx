@@ -6,7 +6,7 @@ import { AuthContextType } from "@/contexts/types";
 /**
  * Hook to access the auth context
  */
-export const useAuthContext = (): AuthContextType & { user?: any } => {
+export const useAuthContext = (): AuthContextType => {
   const context = useContext(AuthContext);
   
   if (context === undefined) {

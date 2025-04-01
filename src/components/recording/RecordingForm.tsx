@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { 
   Save, 
@@ -229,8 +230,7 @@ export function RecordingForm({
       return;
     }
     
-    const currentUser = user?.id;
-    if (!currentUser) {
+    if (!user) {
       toast({
         title: "Authentication required",
         description: "You need to be logged in to create a performance.",
@@ -246,7 +246,7 @@ export function RecordingForm({
       const newPerformance = await performanceService.createPerformance({
         title: newPerformanceTitle,
         startDate: new Date().toISOString().split('T')[0],
-        createdBy: currentUser // Use the actual user ID instead of "current-user"
+        createdBy: user.id // Use the actual user ID instead of "current-user"
       });
       
       console.log("New performance created:", newPerformance);

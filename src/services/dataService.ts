@@ -1,3 +1,4 @@
+
 import { Performance, Rehearsal, Recording } from "@/types";
 import { performanceService, CreatePerformanceData, UpdatePerformanceData } from "./performanceService";
 import { rehearsalService, CreateRehearsalData, UpdateRehearsalData } from "./rehearsalService";
@@ -49,8 +50,8 @@ class DataService {
     return rehearsalService.createRehearsal(rehearsalData);
   }
   
-  updateRehearsal(rehearsalData: UpdateRehearsalData): Promise<Rehearsal | null> {
-    return rehearsalService.updateRehearsal(rehearsalData);
+  updateRehearsal(id: string, rehearsalData: Partial<CreateRehearsalData>): Promise<Rehearsal | null> {
+    return rehearsalService.updateRehearsal(id, rehearsalData);
   }
   
   deleteRehearsal(id: string): Promise<boolean> {
