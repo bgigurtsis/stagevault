@@ -1,15 +1,17 @@
-
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { 
   checkBrowserCompatibility, 
   isCameraPermissionPersistentlyDenied,
   openBrowserPermissionSettings,
-  isProbablyPermanentlyBlocked
+  isProbablyPermanentlyBlocked,
+  handleCameraTimeout,
+  getUserMediaWithTimeout
 } from "@/utils/cameraUtils";
 
 interface UseCameraOptions {
   onCameraError?: (error: string) => void;
+  timeoutDuration?: number;
 }
 
 export const useCamera = (options?: UseCameraOptions) => {
@@ -24,6 +26,7 @@ export const useCamera = (options?: UseCameraOptions) => {
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const timeoutRef = useRef<number | null>(null);
   
   const { toast } = useToast();
   
@@ -88,44 +91,26 @@ export const useCamera = (options?: UseCameraOptions) => {
   const tryAccessCamera = async (attemptNumber = 1, deviceId?: string): Promise<MediaStream> => {
     logDebug(`Camera access attempt #${attemptNumber}`, { deviceId });
     
-    let constraints: MediaStreamConstraints;
-    
-    if (attemptNumber === 1 && deviceId) {
-      constraints = {
-        video: {
-          deviceId: { exact: deviceId },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          frameRate: { ideal: 30 }
-        },
-        audio: true
-      };
-    } else if (attemptNumber === 1) {
-      constraints = {
-        video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          frameRate: { ideal: 30 }
-        },
-        audio: true
-      };
-    } else if (attemptNumber === 2) {
-      constraints = {
-        video: deviceId ? { deviceId: { exact: deviceId } } : true,
-        audio: true
-      };
-    } else {
-      constraints = {
-        video: true,
-        audio: true
-      };
-      setUsingFallbackMode(true);
-    }
-    
-    logDebug("Using constraints", constraints);
-    
     try {
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      // Use the deviceId if provided, otherwise use progressive fallbacks
+      let stream: MediaStream;
+      
+      if (deviceId) {
+        const constraints = {
+          video: {
+            deviceId: { exact: deviceId },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: true
+        };
+        
+        stream = await getUserMediaWithTimeout(constraints, options?.timeoutDuration || 10000);
+      } else {
+        // Use our new handler with progressive fallbacks
+        stream = await handleCameraTimeout(attemptNumber);
+      }
+      
       return stream;
     } catch (error) {
       logDebug(`Attempt #${attemptNumber} failed`, error);
@@ -153,6 +138,12 @@ export const useCamera = (options?: UseCameraOptions) => {
     try {
       setCameraAccessError(null);
       setIsInitializingCamera(true);
+      
+      // Clear any existing timeouts
+      if (timeoutRef.current) {
+        window.clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
       
       // Check permission status first
       const permissionState = await checkPermissionStatus();
@@ -200,6 +191,8 @@ export const useCamera = (options?: UseCameraOptions) => {
           errorMessage = "No camera detected. Please connect a camera and try again.";
         } else if (error.name === "NotReadableError") {
           errorMessage = "Camera is in use by another application. Please close other apps using your camera.";
+        } else if (error.message.includes("Timeout")) {
+          errorMessage = "Timeout starting video source. Please try again or use a different camera.";
         }
       }
       
@@ -214,7 +207,7 @@ export const useCamera = (options?: UseCameraOptions) => {
         variant: "destructive",
       });
     }
-  }, [toast, options]);
+  }, [toast, options, checkPermissionStatus]);
   
   const switchCamera = useCallback(async () => {
     // Stop existing camera stream
@@ -338,6 +331,10 @@ export const useCamera = (options?: UseCameraOptions) => {
     
     return () => {
       stopCamera();
+      // Clear any pending timeouts
+      if (timeoutRef.current) {
+        window.clearTimeout(timeoutRef.current);
+      }
     };
   }, [stopCamera]);
   

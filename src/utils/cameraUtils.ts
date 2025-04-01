@@ -1,4 +1,3 @@
-
 export const getSupportedMimeType = (): string => {
   const types = [
     'video/webm;codecs=vp9,opus',
@@ -127,7 +126,47 @@ export const getDeviceInfo = (): Record<string, string | boolean> => {
   };
 };
 
-// Open browser permission settings with improved error handling
+export const getUserMediaWithTimeout = async (constraints: MediaStreamConstraints, timeoutMs = 10000): Promise<MediaStream> => {
+  return new Promise<MediaStream>(async (resolve, reject) => {
+    // Set a timeout to abort if taking too long
+    const timeoutId = setTimeout(() => {
+      reject(new Error('Timeout starting video source'));
+    }, timeoutMs);
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      clearTimeout(timeoutId);
+      resolve(stream);
+    } catch (error) {
+      clearTimeout(timeoutId);
+      reject(error);
+    }
+  });
+};
+
+export const handleCameraTimeout = (attempts = 1): Promise<MediaStream> => {
+  // Progressively more lenient constraints
+  const videoConstraints = [
+    { width: { ideal: 1280 }, height: { ideal: 720 } }, // First try high quality
+    { width: { ideal: 640 }, height: { ideal: 480 } },  // Then try standard quality
+    true // Finally try with minimal constraints
+  ];
+  
+  // Get the appropriate constraints based on retry attempt
+  const constraintLevel = Math.min(attempts - 1, videoConstraints.length - 1);
+  const constraints = {
+    video: videoConstraints[constraintLevel],
+    audio: true
+  };
+  
+  // Increase timeout for each attempt
+  const timeoutMs = 8000 + (attempts * 2000);
+  
+  console.log(`Trying camera with timeout ${timeoutMs}ms and constraint level ${constraintLevel}`);
+  
+  return getUserMediaWithTimeout(constraints, timeoutMs);
+};
+
 export const openBrowserPermissionSettings = (): void => {
   const browserName = getBrowserName();
   let helpUrl = '';
@@ -163,7 +202,6 @@ export const openBrowserPermissionSettings = (): void => {
   }
 };
 
-// Determine if there's likely a permanent camera block
 export const isProbablyPermanentlyBlocked = (errorMessage: string): boolean => {
   // The specific error message varies by browser
   return (
@@ -173,7 +211,6 @@ export const isProbablyPermanentlyBlocked = (errorMessage: string): boolean => {
   );
 };
 
-// Clear camera-related site data if possible
 export const clearSiteData = (): boolean => {
   try {
     // Try to clear localStorage
@@ -192,7 +229,6 @@ export const clearSiteData = (): boolean => {
   }
 };
 
-// Check if browser has exceeded retry limit
 export const hasExceededRetryLimit = (key: string, limit: number): boolean => {
   try {
     const attemptsString = sessionStorage.getItem(key) || '0';
@@ -211,7 +247,6 @@ export const hasExceededRetryLimit = (key: string, limit: number): boolean => {
   }
 };
 
-// Reset retry counter
 export const resetRetryCounter = (key: string): void => {
   try {
     sessionStorage.removeItem(key);

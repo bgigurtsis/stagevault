@@ -1,6 +1,6 @@
 
 import React from "react";
-import { AlertCircle, RefreshCw, ScreenShare, Settings } from "lucide-react";
+import { AlertCircle, RefreshCw, ScreenShare, Settings, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
@@ -19,6 +19,7 @@ const CameraError: React.FC<CameraErrorProps> = ({
 }) => {
   const isPermissionDenied = errorMessage.includes('denied') || errorMessage.includes('NotAllowedError');
   const isPermanentlyDenied = isPermissionDenied && errorMessage.includes('Permission denied');
+  const isTimeout = errorMessage.includes('Timeout') || errorMessage.includes('timeout');
   
   // Wrap handlers in explicit function to improve event handling
   const handleRetry = (e: React.MouseEvent) => {
@@ -88,6 +89,16 @@ const CameraError: React.FC<CameraErrorProps> = ({
               <li>Click the camera icon in your address bar</li>
               <li>Select "Allow" for camera and microphone</li>
               <li>Refresh the page</li>
+            </ol>
+          </div>
+        ) : isTimeout ? (
+          <div className="mt-4 bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">
+            <p className="font-medium mb-2">Camera timeout issue detected</p>
+            <ol className="list-decimal pl-4 space-y-1">
+              <li>Your camera is taking too long to initialize</li>
+              <li>Close other applications that might be using your camera</li>
+              <li>Try using a different camera if available</li>
+              <li>If on mobile, try restarting your device</li>
             </ol>
           </div>
         ) : null}
