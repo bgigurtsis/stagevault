@@ -95,7 +95,23 @@ export default function Dashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <PerformanceThumbnail title={performance.title} />
+                  <PerformanceThumbnail 
+                  title={performance.title} 
+                  patternType={[
+                    "chevrons",
+                    "octogons",
+                    "overlappingCircles",
+                    "plusSigns",
+                    "xes", 
+                    "hexagons",
+                    "overlappingRings",
+                    "triangles",
+                    "nestedSquares",
+                    "mosaicSquares",
+                    "diamonds",
+                    "tessellation"
+                  ]} 
+                  />
                 </CardContent>
               </Card>
             </Link>

@@ -276,9 +276,23 @@ export default function Performances() {
           {sortedPerformances.map((performance) => (
             <Card key={performance.id} className="overflow-hidden flex flex-col">
               <Link to={`/performances/${performance.id}`} className="flex-1">
-                <PerformanceThumbnail 
-                  title={performance.title} 
-                  className="w-full"
+              <PerformanceThumbnail 
+              title={performance.title} 
+              className="w-full" 
+              patternType={[
+                "chevrons",
+                "octogons",
+                "overlappingCircles",
+                "plusSigns",
+                "xes", 
+                "hexagons",
+                "overlappingRings",
+                "triangles",
+                "nestedSquares",
+                "mosaicSquares",
+                "diamonds",
+                "tessellation"
+              ]} 
                 />
                 <CardContent className="p-4">
                   <div className="flex justify-between items-start mb-2">
