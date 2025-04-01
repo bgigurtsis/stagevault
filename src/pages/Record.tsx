@@ -1,6 +1,6 @@
 
 import { useState, useRef, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { Video, ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -24,7 +24,11 @@ import "./Record.css";
 export default function Record() {
   // UI state
   const [isFormVisible, setIsFormVisible] = useState(false);
+  const [cameraInitialized, setCameraInitialized] = useState(false);
+  const [retryAttempts, setRetryAttempts] = useState(0);
+  
   const isMobile = useIsMobile();
+  const location = useLocation();
   
   // Performance context
   const [currentPerformance, setCurrentPerformance] = useState<Performance | null>(null);
@@ -84,8 +88,8 @@ export default function Record() {
     isLoading,
     isUploading,
     uploadProgress,
-    uploadComplete,
     uploadPhase,
+    uploadComplete,
     uploadError,
     retryCount,
     saveRecording,
@@ -149,22 +153,30 @@ export default function Record() {
     };
   }, [isRecording, requestFullscreen]);
   
-  // Initialize camera and check browser compatibility
+  // Initialize camera and check browser compatibility (with retry limit)
   useEffect(() => {
-    checkBrowserCompatibility();
-    let initTimer: number;
+    let initTimer: number | null = null;
+    let maxRetries = 3;
     
-    // Use a timeout to allow the component to fully mount
-    initTimer = window.setTimeout(() => {
-      startCamera();
-      checkPermissionStatus();
-    }, 500);
-    
-    // Force fullscreen mode on mobile
-    if (isMobile) {
-      const rootElement = document.documentElement;
-      rootElement.style.height = '100vh';
-      rootElement.style.overflow = 'hidden';
+    // Only initialize camera when we're on the recording page
+    if (location.pathname === '/record' && !cameraInitialized && retryAttempts < maxRetries) {
+      console.log(`Camera initialization attempt ${retryAttempts + 1} of ${maxRetries}`);
+      
+      checkBrowserCompatibility();
+      
+      // Use a timeout to allow the component to fully mount
+      initTimer = window.setTimeout(() => {
+        startCamera();
+        checkPermissionStatus();
+        setCameraInitialized(true);
+      }, 500);
+      
+      // Force fullscreen mode on mobile
+      if (isMobile) {
+        const rootElement = document.documentElement;
+        rootElement.style.height = '100vh';
+        rootElement.style.overflow = 'hidden';
+      }
     }
     
     // Cleanup function to ensure resources are properly released
@@ -172,7 +184,12 @@ export default function Record() {
       if (initTimer) {
         window.clearTimeout(initTimer);
       }
-      stopCamera();
+      
+      // Stop camera when component unmounts or route changes
+      if (location.pathname !== '/record') {
+        stopCamera();
+        setCameraInitialized(false);
+      }
       
       if (isMobile) {
         const rootElement = document.documentElement;
@@ -180,7 +197,7 @@ export default function Record() {
         rootElement.style.overflow = '';
       }
     };
-  }, [isMobile, startCamera, checkPermissionStatus, stopCamera]);
+  }, [isMobile, startCamera, checkPermissionStatus, stopCamera, location.pathname, cameraInitialized, retryAttempts]);
   
   // Handle recording start
   const handleStartRecording = () => {
@@ -214,16 +231,34 @@ export default function Record() {
     }
   };
 
-  // Handle retry camera access
+  // Handle retry camera access with tracking to prevent infinite loops
   const handleRetryCamera = () => {
     setCameraAccessError(null);
+    setRetryAttempts(prev => prev + 1);
+    setCameraInitialized(false);
     startCamera();
   };
   
   // Handle "go back" navigation
   const handleGoBack = () => {
     stopCamera(); // Make sure to release camera resources
+    setCameraInitialized(false); // Reset initialization state
     navigate(-1);
+  };
+  
+  // Emergency force reset - uses for severe cases 
+  const handleEmergencyReset = () => {
+    stopCamera();
+    resetRecording();
+    setCameraInitialized(false);
+    setRetryAttempts(0);
+    setCameraAccessError(null);
+    toast({
+      title: "Camera reset",
+      description: "Camera has been reset. Please try again.",
+    });
+    // Force reload the page as last resort
+    setTimeout(() => window.location.href = '/record', 500);
   };
   
   return (
@@ -370,6 +405,20 @@ export default function Record() {
               performanceId={performanceIdParam || currentPerformance?.id || undefined}
             />
           </form>
+        </div>
+      )}
+      
+      {/* Emergency reset button only shown if multiple retry attempts failed */}
+      {retryAttempts >= 2 && cameraAccessError && (
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-30">
+          <Button 
+            variant="destructive" 
+            size="sm"
+            onClick={handleEmergencyReset}
+            className="text-xs"
+          >
+            Emergency Reset
+          </Button>
         </div>
       )}
     </div>

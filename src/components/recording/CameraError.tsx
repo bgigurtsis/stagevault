@@ -20,17 +20,40 @@ const CameraError: React.FC<CameraErrorProps> = ({
   const isPermissionDenied = errorMessage.includes('denied') || errorMessage.includes('NotAllowedError');
   const isPermanentlyDenied = isPermissionDenied && errorMessage.includes('Permission denied');
   
+  // Wrap handlers in explicit function to improve event handling
+  const handleRetry = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log("CameraError: Try Again button clicked");
+    onRetry();
+  };
+  
+  const handleScreenShare = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log("CameraError: Screen Share button clicked");
+    onScreenShare();
+  };
+  
   // Function to handle manual browser permission reset instructions
-  const handleManualReset = () => {
+  const handleManualReset = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log("CameraError: Reset Permissions button clicked");
+    
     // Open a new window with instructions if available
     if (window.open) {
       const browserName = navigator.userAgent.indexOf("Chrome") > -1 ? "Chrome" : 
                          navigator.userAgent.indexOf("Firefox") > -1 ? "Firefox" : 
                          navigator.userAgent.indexOf("Safari") > -1 ? "Safari" : "your browser";
       
-      window.open(`https://support.google.com/chrome/answer/114662?hl=en&co=GENIE.Platform%3DDesktop`, 
-                 'browser_permissions', 
-                 'width=800,height=600');
+      try {
+        window.open(`https://support.google.com/chrome/answer/114662?hl=en&co=GENIE.Platform%3DDesktop`, 
+                   'browser_permissions', 
+                   'width=800,height=600');
+      } catch (err) {
+        console.error("Failed to open browser settings window:", err);
+      }
     }
     
     // Also trigger the reset permissions callback if available
@@ -40,7 +63,7 @@ const CameraError: React.FC<CameraErrorProps> = ({
   };
 
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 p-4 z-10">
+    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 p-4 z-20">
       <div className="bg-background border rounded-lg p-6 max-w-md w-full shadow-lg">
         <Alert variant="destructive" className="mb-4">
           <AlertCircle className="h-5 w-5" />
@@ -73,7 +96,7 @@ const CameraError: React.FC<CameraErrorProps> = ({
           <Button 
             variant="default" 
             size="lg" 
-            onClick={onRetry} 
+            onClick={handleRetry} 
             className="w-full justify-start"
           >
             <RefreshCw className="mr-2 h-4 w-4" />
@@ -83,7 +106,7 @@ const CameraError: React.FC<CameraErrorProps> = ({
           <Button 
             variant="secondary" 
             size="lg" 
-            onClick={onScreenShare} 
+            onClick={handleScreenShare} 
             className="w-full justify-start"
           >
             <ScreenShare className="mr-2 h-4 w-4" />
@@ -102,8 +125,7 @@ const CameraError: React.FC<CameraErrorProps> = ({
         </div>
         
         <p className="mt-4 text-xs text-muted-foreground text-center">
-          Note: If buttons are unresponsive, try navigating back and returning to this page,
-          or refreshing the browser.
+          Note: If you continue to experience issues, try refreshing the page or using a different browser.
         </p>
       </div>
     </div>

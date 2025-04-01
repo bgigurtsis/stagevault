@@ -127,7 +127,7 @@ export const getDeviceInfo = (): Record<string, string | boolean> => {
   };
 };
 
-// New utility function to manually open browser settings
+// Open browser permission settings with improved error handling
 export const openBrowserPermissionSettings = (): void => {
   const browserName = getBrowserName();
   let helpUrl = '';
@@ -149,9 +149,17 @@ export const openBrowserPermissionSettings = (): void => {
   
   // For browsers that support it, open a popup with instructions
   try {
-    window.open(helpUrl, '_blank');
+    const newWindow = window.open(helpUrl, '_blank');
+    
+    // Check if popup was blocked
+    if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+      console.warn('Browser blocked opening settings URL. Likely needs user interaction first.');
+      alert(`Please visit ${helpUrl} to manage camera permissions`);
+    }
   } catch (error) {
     console.warn('Could not open browser settings URL:', error);
+    // Fallback to showing a modal or alert with instructions
+    alert(`To update camera permissions, go to your browser settings and search for "camera" or "permissions"`);
   }
 };
 
@@ -163,4 +171,51 @@ export const isProbablyPermanentlyBlocked = (errorMessage: string): boolean => {
     errorMessage.includes('NotAllowedError') ||
     errorMessage.includes('Permission denied')
   );
+};
+
+// Clear camera-related site data if possible
+export const clearSiteData = (): boolean => {
+  try {
+    // Try to clear localStorage
+    localStorage.removeItem('camera_permissions');
+    
+    // Try to clear IndexedDB
+    window.indexedDB?.deleteDatabase('media_permissions');
+    
+    // Try to clear sessionStorage
+    sessionStorage.removeItem('camera_state');
+    
+    return true;
+  } catch (error) {
+    console.error('Failed to clear site data:', error);
+    return false;
+  }
+};
+
+// Check if browser has exceeded retry limit
+export const hasExceededRetryLimit = (key: string, limit: number): boolean => {
+  try {
+    const attemptsString = sessionStorage.getItem(key) || '0';
+    const attempts = parseInt(attemptsString, 10);
+    
+    if (attempts >= limit) {
+      return true;
+    }
+    
+    // Increment the counter
+    sessionStorage.setItem(key, String(attempts + 1));
+    return false;
+  } catch (error) {
+    console.error('Error tracking retry limits:', error);
+    return false;
+  }
+};
+
+// Reset retry counter
+export const resetRetryCounter = (key: string): void => {
+  try {
+    sessionStorage.removeItem(key);
+  } catch (error) {
+    console.error('Error resetting retry counter:', error);
+  }
 };
