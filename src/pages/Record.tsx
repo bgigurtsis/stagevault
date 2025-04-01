@@ -19,6 +19,7 @@ import CameraControls from "@/components/recording/CameraControls";
 import RecordingControls from "@/components/recording/RecordingControls";
 import RecordingTimer from "@/components/recording/RecordingTimer";
 import UploadProgress from "@/components/recording/UploadProgress";
+import MobileSwipeGesture from "@/components/MobileSwipeGesture";
 import "./Record.css";
 
 export default function Record() {
@@ -269,6 +270,13 @@ export default function Record() {
     setTimeout(() => window.location.href = '/record', 500);
   };
   
+  // When recording is complete, show the form in partial state instead of full
+  useEffect(() => {
+    if (recordedBlob) {
+      setIsFormVisible(true);
+    }
+  }, [recordedBlob]);
+
   return (
     <div 
       className={`record-container ${isRecording || recordedBlob ? 'fullscreen-recording' : ''}`}
@@ -299,7 +307,11 @@ export default function Record() {
       )}
       
       <div className="camera-preview-container">
-        <div className="camera-view">
+        <MobileSwipeGesture
+          onSwipeUp={() => !isRecording && recordedBlob && setIsFormVisible(true)}
+          onSwipeDown={() => !isRecording && recordedBlob && setIsFormVisible(false)}
+          className="camera-view"
+        >
           {!isRecording && !recordedBlob && !cameraAccessError && !isInitializingCamera && !streamRef.current && (
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <Video className="h-12 w-12 text-white/50 mb-2" />
@@ -337,7 +349,7 @@ export default function Record() {
               isPaused={isPaused}
             />
           )}
-        </div>
+        </MobileSwipeGesture>
         
         {!isFormVisible && (
           <div className="control-bar">
@@ -398,23 +410,20 @@ export default function Record() {
       />
       
       {recordedBlob && (
-        <div className={`recording-form-container ${!isFormVisible ? 'hidden' : ''}`}>
-          <div className="recording-form-handle" onClick={toggleFormVisibility}></div>
-          <form id="recording-form" className="space-y-4">
-            <RecordingForm 
-              isVisible={isFormVisible}
-              recordingTime={recordingTime} 
-              onSaveRecording={handleSaveRecording}
-              isUploading={isUploading}
-              uploadComplete={uploadComplete}
-              isMobile={isMobile}
-              onToggleVisibility={toggleFormVisibility}
-              onCancel={handleCancelRecording}
-              rehearsalId={rehearsalIdParam || undefined}
-              performanceId={performanceIdParam || currentPerformance?.id || undefined}
-            />
-          </form>
-        </div>
+        <form id="recording-form" className="space-y-4">
+          <RecordingForm 
+            isVisible={isFormVisible}
+            recordingTime={recordingTime} 
+            onSaveRecording={handleSaveRecording}
+            isUploading={isUploading}
+            uploadComplete={uploadComplete}
+            isMobile={isMobile}
+            onToggleVisibility={() => setIsFormVisible(!isFormVisible)}
+            onCancel={handleCancelRecording}
+            rehearsalId={rehearsalIdParam || undefined}
+            performanceId={performanceIdParam || currentPerformance?.id || undefined}
+          />
+        </form>
       )}
       
       {/* Emergency reset button only shown if multiple retry attempts failed */}
