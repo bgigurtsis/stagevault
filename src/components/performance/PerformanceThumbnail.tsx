@@ -18,14 +18,14 @@ export const PerformanceThumbnail: React.FC<PerformanceThumbnailProps> = ({
   fallbackIcon = false,
   patternType
 }) => {
-  // Make sure we have a string for patternSeed
+  // Make sure we have a valid string for patternSeed
   // Always prioritize using performanceId when available
-  const patternSeed = performanceId ? `${title}-${performanceId}` : title;
+  const patternSeed = performanceId ? `${title}-${performanceId}` : title || "default-pattern";
 
   // Select a pattern type to use
   const selectedPatternType = useMemo(() => {
     if (!patternType) {
-      return undefined; // Let GeoPattern choose a default
+      return "chevrons"; // Use a specific default instead of undefined
     }
     
     if (Array.isArray(patternType)) {
@@ -38,29 +38,42 @@ export const PerformanceThumbnail: React.FC<PerformanceThumbnailProps> = ({
     return patternType;
   }, [patternType, patternSeed]);
 
-  // Generate a slightly different hue based on performanceId or title
+  // Generate a fixed color with variations based on the seed
   const getColorVariation = () => {
-    // Make sure we use patternSeed which is guaranteed to be a string
-    const idHash = patternSeed.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    // Use the hash to create small variations in the orange base color
-    // This keeps it in the orange family but with subtle differences
-    const hueShift = (idHash % 40) - 20; // -20 to +19 shift
-    return `hsl(${30 + hueShift}, 85%, 65%)`; // Base is around 30 (orange)
+    // Use a default string if patternSeed is somehow empty
+    const seed = patternSeed || "default-seed";
+    const idHash = seed.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    
+    // Use predefined color values instead of dynamic HSL to avoid color parsing issues
+    const baseOrangeColors = [
+      "#f97316", // orange-500
+      "#f59e0b", // amber-500
+      "#ea580c", // orange-600
+      "#d97706", // amber-600
+      "#fb923c", // orange-400
+      "#fbbf24"  // amber-400
+    ];
+    
+    // Use the hash to select a predefined color
+    return baseOrangeColors[idHash % baseOrangeColors.length];
   };
   
-  // Try-catch block to handle any issues with pattern generation
-  let backgroundImage = '';
-  try {
-    const pattern = GeoPattern.generate(patternSeed, {
-      baseColor: getColorVariation(),
-      generator: selectedPatternType
-    });
-    backgroundImage = pattern.toDataUrl();
-  } catch (error) {
-    console.error('Error generating pattern:', error);
-    // Fallback to a simple gradient if pattern generation fails
-    backgroundImage = `linear-gradient(135deg, #f59e0b, #f97316)`;
-  }
+  // Generate background with strong error handling
+  const backgroundImage = useMemo(() => {
+    try {
+      // Use explicit color and pattern type to avoid issues
+      const color = getColorVariation();
+      const pattern = GeoPattern.generate(patternSeed, {
+        baseColor: color,
+        generator: selectedPatternType
+      });
+      return pattern.toDataUrl();
+    } catch (error) {
+      console.error('Error generating pattern:', error);
+      // Fallback to a simple gradient that doesn't rely on the library
+      return `linear-gradient(135deg, #f59e0b, #f97316)`;
+    }
+  }, [patternSeed, selectedPatternType]);
   
   return (
     <div 
