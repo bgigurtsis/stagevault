@@ -11,12 +11,12 @@ export const getSupportedMimeType = (): string => {
   
   for (const type of types) {
     if (MediaRecorder.isTypeSupported(type)) {
-      console.log(`Mime type supported: ${type}`);
+      console.log(`[CAMERA-DEBUG] Mime type supported: ${type}`);
       return type;
     }
   }
   
-  console.log(`No specific mime type supported, using fallback`);
+  console.log(`[CAMERA-DEBUG] No specific mime type supported, using fallback`);
   return 'video/webm'; // fallback
 };
 
@@ -35,22 +35,22 @@ export const checkBrowserCompatibility = () => {
     secureContext: window.isSecureContext
   };
   
-  console.log("Browser compatibility check:", compatibility);
+  console.log("[CAMERA-DEBUG] Browser compatibility check:", compatibility);
   
   if (!compatibility.userMediaSupported) {
-    console.warn("getUserMedia is not supported on this browser");
+    console.warn("[CAMERA-DEBUG] getUserMedia is not supported on this browser");
   }
   
   if (!compatibility.mediaRecorderSupported) {
-    console.warn("MediaRecorder is not supported on this browser");
+    console.warn("[CAMERA-DEBUG] MediaRecorder is not supported on this browser");
   }
   
   if (!compatibility.secureContext) {
-    console.warn("Not in secure context, camera access may be unavailable");
+    console.warn("[CAMERA-DEBUG] Not in secure context, camera access may be unavailable");
   }
   
   if (compatibility.isIOS && compatibility.browserName !== "Safari") {
-    console.warn("On iOS, only Safari fully supports camera recording");
+    console.warn("[CAMERA-DEBUG] On iOS, only Safari fully supports camera recording");
   }
   
   return compatibility;
@@ -105,7 +105,7 @@ export const isCameraPermissionPersistentlyDenied = async (): Promise<boolean> =
     const permissionStatus = await navigator.permissions.query({ name: 'camera' as PermissionName });
     return permissionStatus.state === 'denied';
   } catch (error) {
-    console.error("Error checking camera permission status:", error);
+    console.error("[CAMERA-DEBUG] Error checking camera permission status:", error);
     return false;
   }
 };
@@ -284,8 +284,8 @@ export const getScreenShareWithAudio = async (): Promise<MediaStream> => {
     // First try to get display media with audio
     const displayStream = await navigator.mediaDevices.getDisplayMedia({
       video: {
-        cursor: 'always',
-        displaySurface: 'monitor',
+        // Fixed: remove 'cursor' property which is not in MediaTrackConstraints
+        displaySurface: 'monitor'
       },
       audio: true
     });
@@ -371,4 +371,92 @@ export const isLowPowerMode = (): boolean => {
   
   console.log(`[CAMERA-DEBUG] Low power mode check: ${isLowPower} (hardwareConcurrency: ${navigator.hardwareConcurrency})`);
   return isLowPower;
+};
+
+// Enhanced camera controls for CameraControls.tsx
+export const getCameraControlsSupport = async (stream: MediaStream): Promise<Record<string, boolean>> => {
+  if (!stream) {
+    console.log('[CAMERA-DEBUG] No stream provided to getCameraControlsSupport');
+    return { 
+      flashSupported: false,
+      zoomSupported: false,
+      focusSupported: false
+    };
+  }
+
+  const videoTrack = stream.getVideoTracks()[0];
+  if (!videoTrack) {
+    console.log('[CAMERA-DEBUG] No video track in stream');
+    return { 
+      flashSupported: false,
+      zoomSupported: false,
+      focusSupported: false
+    };
+  }
+
+  try {
+    const capabilities = videoTrack.getCapabilities();
+    console.log('[CAMERA-DEBUG] Camera capabilities:', capabilities);
+    
+    return {
+      flashSupported: !!(capabilities && 'torch' in capabilities),
+      zoomSupported: !!(capabilities && 'zoom' in capabilities),
+      focusSupported: !!(capabilities && 'focusMode' in capabilities)
+    };
+  } catch (error) {
+    console.error('[CAMERA-DEBUG] Error checking camera capabilities:', error);
+    return { 
+      flashSupported: false,
+      zoomSupported: false,
+      focusSupported: false
+    };
+  }
+};
+
+// New function to retry screen sharing with enhanced params, if available.
+export const retryScreenShareWithEnhancedParams = async (): Promise<MediaStream> => {
+  console.log('[CAMERA-DEBUG] Attempting enhanced screen share retry');
+  
+  try {
+    // First try standard screen sharing
+    const displayStream = await navigator.mediaDevices.getDisplayMedia({
+      video: {
+        displaySurface: 'monitor'
+      },
+      audio: true 
+    });
+    
+    return displayStream;
+  } catch (error) {
+    console.error('[CAMERA-DEBUG] Enhanced screen share failed:', error);
+    
+    // Fallback to basic video only
+    return navigator.mediaDevices.getDisplayMedia({ 
+      video: true 
+    });
+  }
+};
+
+// New function to attempt camera access with fallback to screenshare
+export const tryMediaWithFallback = async (): Promise<{ stream: MediaStream; isFallback: boolean }> => {
+  console.log('[CAMERA-DEBUG] Starting media with fallback sequence');
+  
+  try {
+    // First try regular camera access
+    console.log('[CAMERA-DEBUG] Attempting primary camera access');
+    const cameraStream = await handleCameraTimeout(1);
+    return { stream: cameraStream, isFallback: false };
+  } catch (cameraError) {
+    console.warn('[CAMERA-DEBUG] Primary camera access failed, attempting fallback:', cameraError);
+    
+    try {
+      // If camera fails, try screen sharing
+      console.log('[CAMERA-DEBUG] Attempting screen share fallback');
+      const screenStream = await getScreenShareWithAudio();
+      return { stream: screenStream, isFallback: true };
+    } catch (screenError) {
+      console.error('[CAMERA-DEBUG] Screen share fallback also failed:', screenError);
+      throw new Error('Both camera and screen sharing failed. Please check your settings and permissions.');
+    }
+  }
 };
