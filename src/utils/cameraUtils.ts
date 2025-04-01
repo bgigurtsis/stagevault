@@ -126,9 +126,38 @@ export const getDeviceInfo = (): Record<string, string | boolean> => {
   };
 };
 
+// Improved timeout handling with progressively more aggressive constraints
 export const getUserMediaWithTimeout = async (constraints: MediaStreamConstraints, timeoutMs = 10000): Promise<MediaStream> => {
   console.log(`[CAMERA-DEBUG] getUserMediaWithTimeout called with timeout ${timeoutMs}ms and constraints:`, constraints);
   
+  // Use AbortController if available for cleaner timeout handling
+  if ('AbortController' in window) {
+    const controller = new AbortController();
+    const signal = controller.signal;
+    
+    const timeoutId = setTimeout(() => {
+      console.log(`[CAMERA-DEBUG] getUserMedia timed out after ${timeoutMs}ms`);
+      controller.abort(`Timeout starting video source after ${timeoutMs}ms`);
+    }, timeoutMs);
+    
+    try {
+      console.log(`[CAMERA-DEBUG] Attempting navigator.mediaDevices.getUserMedia with AbortController...`);
+      // @ts-ignore - TypeScript doesn't recognize signal in the getUserMedia options
+      const stream = await navigator.mediaDevices.getUserMedia({ ...constraints, signal });
+      clearTimeout(timeoutId);
+      
+      console.log(`[CAMERA-DEBUG] getUserMedia successful with AbortController, got stream with tracks:`, 
+        stream.getTracks().map(t => `${t.kind}:${t.label} (${t.readyState})`));
+      
+      return stream;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      console.log(`[CAMERA-DEBUG] getUserMedia with AbortController failed:`, error);
+      throw error;
+    }
+  }
+  
+  // Fallback to regular Promise timeout pattern for older browsers
   return new Promise<MediaStream>(async (resolve, reject) => {
     // Set a timeout to abort if taking too long
     const timeoutId = setTimeout(() => {
@@ -275,7 +304,68 @@ export const resetRetryCounter = (key: string): void => {
   }
 };
 
-// New helper for screen sharing fallback with specific constraints
+// Enhanced emergency fallback that tries multiple strategies
+export const emergencyMediaFallback = async (): Promise<MediaStream | null> => {
+  console.log('[CAMERA-DEBUG] Attempting emergency media fallback');
+  
+  try {
+    // Strategy 1: Try with only video, no audio
+    console.log('[CAMERA-DEBUG] Emergency strategy 1: Video only');
+    try {
+      const videoOnlyStream = await navigator.mediaDevices.getUserMedia({ 
+        video: true, 
+        audio: false 
+      });
+      console.log('[CAMERA-DEBUG] Video-only stream obtained successfully');
+      return videoOnlyStream;
+    } catch (videoErr) {
+      console.log('[CAMERA-DEBUG] Video-only stream failed:', videoErr);
+    }
+    
+    // Strategy 2: Try with only a specific camera if multiple are available
+    console.log('[CAMERA-DEBUG] Emergency strategy 2: Try specific camera');
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cameras = devices.filter(device => device.kind === 'videoinput');
+      
+      if (cameras.length > 1) {
+        // Try the second camera (often the back camera on mobile)
+        const backCamera = cameras[1];
+        const specificCameraStream = await navigator.mediaDevices.getUserMedia({
+          video: { deviceId: { exact: backCamera.deviceId } },
+          audio: false
+        });
+        console.log('[CAMERA-DEBUG] Specific camera stream obtained successfully');
+        return specificCameraStream;
+      }
+    } catch (cameraErr) {
+      console.log('[CAMERA-DEBUG] Specific camera strategy failed:', cameraErr);
+    }
+    
+    // Strategy 3: Screen sharing as absolute last resort
+    console.log('[CAMERA-DEBUG] Emergency strategy 3: Screen sharing');
+    try {
+      const displayStream = await navigator.mediaDevices.getDisplayMedia({ 
+        video: {
+          displaySurface: 'monitor'
+        } 
+      });
+      console.log('[CAMERA-DEBUG] Screen sharing obtained successfully');
+      return displayStream;
+    } catch (screenErr) {
+      console.log('[CAMERA-DEBUG] Screen sharing strategy failed:', screenErr);
+    }
+    
+    // If all strategies fail
+    console.log('[CAMERA-DEBUG] All emergency strategies failed');
+    return null;
+  } catch (error) {
+    console.error('[CAMERA-DEBUG] Emergency fallback failed with error:', error);
+    return null;
+  }
+};
+
+// Enhanced screen share with better mobile detection and fallback
 export const getScreenShareWithAudio = async (): Promise<MediaStream> => {
   console.log('[CAMERA-DEBUG] Attempting to get screen share with audio');
   
@@ -283,7 +373,6 @@ export const getScreenShareWithAudio = async (): Promise<MediaStream> => {
     // First try to get display media with audio
     const displayStream = await navigator.mediaDevices.getDisplayMedia({
       video: {
-        // Fixed: remove 'cursor' property which is not in MediaTrackConstraints
         displaySurface: 'monitor'
       },
       audio: true
@@ -441,7 +530,7 @@ export const tryMediaWithFallback = async (): Promise<{ stream: MediaStream; isF
   console.log('[CAMERA-DEBUG] Starting media with fallback sequence');
   
   try {
-    // First try regular camera access
+    // First try regular camera access with increased timeout
     console.log('[CAMERA-DEBUG] Attempting primary camera access');
     const cameraStream = await handleCameraTimeout(1);
     return { stream: cameraStream, isFallback: false };
@@ -449,13 +538,20 @@ export const tryMediaWithFallback = async (): Promise<{ stream: MediaStream; isF
     console.warn('[CAMERA-DEBUG] Primary camera access failed, attempting fallback:', cameraError);
     
     try {
-      // If camera fails, try screen sharing
+      // First fallback: Try emergency camera access
+      console.log('[CAMERA-DEBUG] Attempting emergency camera fallback');
+      const emergencyStream = await emergencyMediaFallback();
+      if (emergencyStream) {
+        return { stream: emergencyStream, isFallback: true };
+      }
+      
+      // Second fallback: Screen sharing
       console.log('[CAMERA-DEBUG] Attempting screen share fallback');
       const screenStream = await getScreenShareWithAudio();
       return { stream: screenStream, isFallback: true };
-    } catch (screenError) {
-      console.error('[CAMERA-DEBUG] Screen share fallback also failed:', screenError);
-      throw new Error('Both camera and screen sharing failed. Please check your settings and permissions.');
+    } catch (fallbackError) {
+      console.error('[CAMERA-DEBUG] All fallbacks failed:', fallbackError);
+      throw new Error('Camera access failed after trying all fallback options. Please check your browser settings and permissions.');
     }
   }
 };

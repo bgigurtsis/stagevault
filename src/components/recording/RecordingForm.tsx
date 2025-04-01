@@ -68,6 +68,8 @@ export function RecordingForm({
   const [newPerformanceTitle, setNewPerformanceTitle] = useState("");
   const [newRehearsalTitle, setNewRehearsalTitle] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   
   const { toast } = useToast();
   
@@ -87,10 +89,17 @@ export function RecordingForm({
     }
   }, [title]);
   
+  // Load performances and rehearsals with error handling
   useEffect(() => {
     const fetchData = async () => {
       try {
+        console.log("RecordingForm: Fetching performances and rehearsals");
+        console.log("Initial performanceId:", performanceId);
+        console.log("Initial rehearsalId:", rehearsalId);
+        
+        setFormError(null);
         const performanceData = await performanceService.getPerformances();
+        console.log("Fetched performances:", performanceData);
         setPerformances(performanceData);
         
         // If we have a performance ID from props, prioritize it
@@ -98,9 +107,11 @@ export function RecordingForm({
           (performanceData.length > 0 && !selectedPerformance ? performanceData[0].id : null);
         
         if (initialPerformanceId) {
+          console.log("Setting selected performance:", initialPerformanceId);
           setSelectedPerformance(initialPerformanceId);
           
           const rehearsalData = await rehearsalService.getRehearsalsByPerformance(initialPerformanceId);
+          console.log("Fetched rehearsals for performance:", rehearsalData);
           setAvailableRehearsals(rehearsalData);
           
           // If we have a rehearsal ID from props, prioritize it
@@ -108,11 +119,13 @@ export function RecordingForm({
             (rehearsalData.length > 0 && !selectedRehearsal ? rehearsalData[0].id : null);
             
           if (initialRehearsalId) {
+            console.log("Setting selected rehearsal:", initialRehearsalId);
             setSelectedRehearsal(initialRehearsalId);
           }
         }
       } catch (error) {
-        console.error("Error fetching data:", error);
+        console.error("Error fetching performances and rehearsals:", error);
+        setFormError("Failed to load performances and rehearsals");
         toast({
           title: "Error",
           description: "Failed to load performances and rehearsals.",
@@ -124,27 +137,36 @@ export function RecordingForm({
     fetchData();
   }, [toast, performanceId, rehearsalId]);
   
+  // Handle performance change and load associated rehearsals
   useEffect(() => {
     const updateRehearsals = async () => {
       if (selectedPerformance) {
         try {
+          console.log("Updating rehearsals for performance:", selectedPerformance);
+          setFormError(null);
           const rehearsals = await rehearsalService.getRehearsalsByPerformance(selectedPerformance);
+          console.log("Rehearsals updated:", rehearsals);
           setAvailableRehearsals(rehearsals);
           
           // Only auto-select the first rehearsal if none is selected and we're not using a fixed rehearsal ID
           if (rehearsals.length > 0 && !selectedRehearsal && !rehearsalId) {
+            console.log("Auto-selecting first rehearsal:", rehearsals[0].id);
             setSelectedRehearsal(rehearsals[0].id);
           }
         } catch (error) {
           console.error("Error fetching rehearsals for performance:", error);
+          setFormError("Failed to load rehearsals for this performance");
         }
       }
     };
 
     updateRehearsals();
-  }, [selectedPerformance, selectedRehearsal, rehearsalId]);
-  
-  const handleCreatePerformance = async () => {
+  }, [selectedPerformance, rehearsalId]);
+
+  // Enhanced create performance function with better error handling
+  const handleCreatePerformance = async (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    
     if (!newPerformanceTitle.trim()) {
       toast({
         title: "Title required",
@@ -155,33 +177,44 @@ export function RecordingForm({
     }
     
     try {
+      console.log("Creating new performance:", newPerformanceTitle);
+      setIsSubmitting(true);
+      
       const newPerformance = await performanceService.createPerformance({
         title: newPerformanceTitle,
         startDate: new Date().toISOString().split('T')[0],
         createdBy: "current-user"
       });
       
-      toast({
-        title: "Success",
-        description: "New performance created successfully.",
-      });
+      console.log("New performance created:", newPerformance);
       
+      // Update the local state with the new performance
       setPerformances(prev => [newPerformance, ...prev]);
       setSelectedPerformance(newPerformance.id);
       setIsCreatingPerformance(false);
       setNewPerformanceTitle("");
       
+      toast({
+        title: "Success",
+        description: "New performance created successfully.",
+      });
     } catch (error) {
       console.error("Error creating performance:", error);
+      setFormError("Failed to create new performance");
       toast({
         title: "Error",
         description: "Failed to create new performance.",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
   
-  const handleCreateRehearsal = async () => {
+  // Enhanced create rehearsal function with better error handling
+  const handleCreateRehearsal = async (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    
     if (!selectedPerformance) {
       toast({
         title: "Performance required",
@@ -201,259 +234,305 @@ export function RecordingForm({
     }
     
     try {
+      console.log("Creating new rehearsal:", newRehearsalTitle, "for performance:", selectedPerformance);
+      setIsSubmitting(true);
+      
       const today = new Date().toISOString().split('T')[0];
       const newRehearsal = await rehearsalService.createRehearsal({
         performanceId: selectedPerformance,
         title: newRehearsalTitle,
         date: today,
-        notes: `Created during recording on ${today}`
+        notes: "Created from recording form."
       });
       
-      toast({
-        title: "Success",
-        description: "New rehearsal created successfully.",
-      });
+      console.log("New rehearsal created:", newRehearsal);
       
+      // Update the local state with the new rehearsal
       setAvailableRehearsals(prev => [newRehearsal, ...prev]);
       setSelectedRehearsal(newRehearsal.id);
       setIsCreatingRehearsal(false);
       setNewRehearsalTitle("");
       
+      toast({
+        title: "Success",
+        description: "New rehearsal created successfully.",
+      });
     } catch (error) {
       console.error("Error creating rehearsal:", error);
+      setFormError("Failed to create new rehearsal");
       toast({
         title: "Error",
         description: "Failed to create new rehearsal.",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
   
-  const formatTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  // Handle form submission validation
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log("Form submit called");
+    
+    // Validate form fields
+    if (!title.trim()) {
+      setFormError("Title is required");
+      toast({
+        title: "Title required",
+        description: "Please enter a title for your recording.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!selectedRehearsal) {
+      setFormError("Rehearsal is required");
+      toast({
+        title: "Rehearsal required",
+        description: "Please select a rehearsal for this recording.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    console.log("Form validation passed, proceeding with save");
+    setFormError(null);
+    onSaveRecording();
   };
   
-  if (!isVisible && isMobile) {
-    return (
-      <div className="fixed bottom-0 left-0 right-0 bg-background/90 backdrop-blur-sm p-3 shadow-lg rounded-t-2xl z-40">
-        <Button 
-          variant="outline" 
-          className="w-full flex justify-between items-center" 
-          onClick={onToggleVisibility}
-        >
-          <span>Add recording details</span>
-          <ChevronUp className="h-4 w-4" />
-        </Button>
-      </div>
-    );
-  }
+  // Reset state when the form completes upload
+  useEffect(() => {
+    if (uploadComplete) {
+      console.log("Upload complete, resetting form state");
+      setTitle("");
+      setNotes("");
+      setTags("");
+      setFormError(null);
+    }
+  }, [uploadComplete]);
   
   return (
-    <div className={`space-y-4 ${className}`}>
-      {isMobile && (
-        <div className="flex justify-between items-center mb-2">
-          <h3 className="font-semibold">Recording Details</h3>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={onToggleVisibility}
-            className="h-8 w-8"
-          >
-            <ChevronDown className="h-4 w-4" />
-          </Button>
+    <div className={`recording-metadata ${className}`}>
+      <div className="form-header flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold">Recording Details</h2>
+        {onToggleVisibility && (
+          <button onClick={onToggleVisibility} className="text-gray-500 hover:text-gray-700">
+            <X className="h-5 w-5" />
+          </button>
+        )}
+      </div>
+      
+      {formError && (
+        <div className="bg-red-50 border border-red-200 text-red-800 rounded-md p-3 mb-4">
+          <p className="text-sm">{formError}</p>
         </div>
       )}
       
-      <div className="space-y-2">
-        <Label htmlFor="title">Recording Title *</Label>
-        <Input
-          id="title"
-          placeholder="Enter a title for this recording"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          required
-        />
-      </div>
-      
-      <div className="space-y-2">
-        <Label htmlFor="performance">Performance *</Label>
-        {!isCreatingPerformance ? (
-          <Select
-            value={selectedPerformance}
-            onValueChange={(value) => {
-              if (value === "create-new") {
-                setIsCreatingPerformance(true);
-              } else {
-                setSelectedPerformance(value);
-              }
-            }}
-          >
-            <SelectTrigger id="performance">
-              <SelectValue placeholder="Select a performance" />
-            </SelectTrigger>
-            <SelectContent>
-              {performances.map((performance) => (
-                <SelectItem key={performance.id} value={performance.id}>
-                  {performance.title}
-                </SelectItem>
-              ))}
-              <SelectItem value="create-new" className="text-primary">
-                <span className="flex items-center">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Create New Performance
-                </span>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        ) : (
-          <div className="bg-accent/30 p-3 rounded-md space-y-3">
-            <div className="flex justify-between items-center">
-              <h4 className="text-sm font-medium">Create New Performance</h4>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => setIsCreatingPerformance(false)}
+      <div className="space-y-4" onChange={(e) => setFormError(null)}>
+        <div>
+          <Label htmlFor="title">Title</Label>
+          <Input 
+            id="title" 
+            name="title" 
+            value={title} 
+            onChange={(e) => setTitle(e.target.value)} 
+            placeholder="Enter recording title"
+            disabled={isUploading || isSubmitting}
+          />
+        </div>
+        
+        <div>
+          <Label htmlFor="performance">Performance</Label>
+          {isCreatingPerformance ? (
+            <div className="flex flex-col gap-2">
+              <Input 
+                id="new-performance" 
+                value={newPerformanceTitle} 
+                onChange={(e) => setNewPerformanceTitle(e.target.value)} 
+                placeholder="New performance title"
+                disabled={isUploading || isSubmitting}
+              />
+              <div className="flex gap-2">
+                <Button 
+                  type="button" 
+                  size="sm" 
+                  variant="default"
+                  onClick={handleCreatePerformance}
+                  disabled={isUploading || isSubmitting}
+                >
+                  Create
+                </Button>
+                <Button 
+                  type="button" 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => setIsCreatingPerformance(false)}
+                  disabled={isUploading || isSubmitting}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <Select 
+                name="performance"
+                value={selectedPerformance} 
+                onValueChange={setSelectedPerformance}
+                disabled={isUploading || isSubmitting || !!performanceId}
               >
-                <X className="h-4 w-4" />
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a performance" />
+                </SelectTrigger>
+                <SelectContent>
+                  {performances.map(performance => (
+                    <SelectItem key={performance.id} value={performance.id}>
+                      {performance.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Button 
+                type="button" 
+                size="icon" 
+                variant="outline"
+                onClick={() => setIsCreatingPerformance(true)}
+                disabled={isUploading || isSubmitting}
+              >
+                <Plus className="h-4 w-4" />
               </Button>
             </div>
-            <Input
-              value={newPerformanceTitle}
-              onChange={(e) => setNewPerformanceTitle(e.target.value)}
-              placeholder="Enter performance title"
-              className="border-primary"
-            />
-            <Button 
-              size="sm" 
-              className="w-full"
-              onClick={handleCreatePerformance}
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Create Performance
-            </Button>
-          </div>
-        )}
-      </div>
-      
-      <div className="space-y-2">
-        <Label htmlFor="rehearsal">Rehearsal *</Label>
-        {!isCreatingRehearsal ? (
-          <Select
-            value={selectedRehearsal}
-            onValueChange={(value) => {
-              if (value === "create-new") {
-                setIsCreatingRehearsal(true);
-              } else {
-                setSelectedRehearsal(value);
-              }
-            }}
-            disabled={!selectedPerformance}
-          >
-            <SelectTrigger id="rehearsal">
-              <SelectValue placeholder={selectedPerformance ? "Select a rehearsal" : "Select a performance first"} />
-            </SelectTrigger>
-            <SelectContent>
-              {availableRehearsals.map((rehearsal) => (
-                <SelectItem key={rehearsal.id} value={rehearsal.id}>
-                  {rehearsal.title}
-                </SelectItem>
-              ))}
-              <SelectItem value="create-new" className="text-primary">
-                <span className="flex items-center">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Create New Rehearsal
-                </span>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        ) : (
-          <div className="bg-accent/30 p-3 rounded-md space-y-3">
-            <div className="flex justify-between items-center">
-              <h4 className="text-sm font-medium">Create New Rehearsal</h4>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => setIsCreatingRehearsal(false)}
+          )}
+        </div>
+        
+        <div>
+          <Label htmlFor="rehearsal">Rehearsal</Label>
+          {isCreatingRehearsal ? (
+            <div className="flex flex-col gap-2">
+              <Input 
+                id="new-rehearsal" 
+                value={newRehearsalTitle} 
+                onChange={(e) => setNewRehearsalTitle(e.target.value)} 
+                placeholder="New rehearsal title"
+                disabled={isUploading || isSubmitting}
+              />
+              <div className="flex gap-2">
+                <Button 
+                  type="button" 
+                  size="sm" 
+                  variant="default"
+                  onClick={handleCreateRehearsal}
+                  disabled={isUploading || isSubmitting || !selectedPerformance}
+                >
+                  Create
+                </Button>
+                <Button 
+                  type="button" 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => setIsCreatingRehearsal(false)}
+                  disabled={isUploading || isSubmitting}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <Select 
+                name="rehearsal"
+                value={selectedRehearsal} 
+                onValueChange={setSelectedRehearsal}
+                disabled={isUploading || isSubmitting || !selectedPerformance || !!rehearsalId}
               >
-                <X className="h-4 w-4" />
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a rehearsal" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableRehearsals.map(rehearsal => (
+                    <SelectItem key={rehearsal.id} value={rehearsal.id}>
+                      {rehearsal.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Button 
+                type="button" 
+                size="icon" 
+                variant="outline"
+                onClick={() => setIsCreatingRehearsal(true)}
+                disabled={isUploading || isSubmitting || !selectedPerformance}
+              >
+                <Plus className="h-4 w-4" />
               </Button>
             </div>
-            <Input
-              value={newRehearsalTitle}
-              onChange={(e) => setNewRehearsalTitle(e.target.value)}
-              placeholder="Enter rehearsal title"
-              className="border-primary"
-            />
-            <Button 
-              size="sm" 
-              className="w-full"
-              onClick={handleCreateRehearsal}
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Create Rehearsal
-            </Button>
-          </div>
-        )}
-      </div>
-      
-      <Button
-        variant="outline"
-        type="button"
-        onClick={() => setAdvancedOpen(!advancedOpen)}
-        className="w-full justify-between"
-      >
-        <span>Advanced Options</span>
-        {advancedOpen ? (
-          <ChevronUp className="h-4 w-4" />
-        ) : (
-          <ChevronDown className="h-4 w-4" />
-        )}
-      </Button>
-      
-      {advancedOpen && (
-        <>
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea
-              id="notes"
-              placeholder="Add notes about this recording"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={4}
-            />
-          </div>
+          )}
+        </div>
+        
+        <div>
+          <button
+            type="button"
+            className="flex items-center text-sm font-medium text-primary mb-2"
+            onClick={() => setAdvancedOpen(!advancedOpen)}
+          >
+            {advancedOpen ? (
+              <ChevronUp className="h-4 w-4 mr-1" />
+            ) : (
+              <ChevronDown className="h-4 w-4 mr-1" />
+            )}
+            {advancedOpen ? "Hide advanced options" : "Show advanced options"}
+          </button>
           
-          <div className="space-y-2">
-            <Label htmlFor="tags">Tags</Label>
-            <Input
-              id="tags"
-              placeholder="Add tags separated by commas"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              E.g., solo, group, needs work
-            </p>
-          </div>
-        </>
-      )}
-      
-      <div className="flex items-center text-sm text-muted-foreground mb-2">
-        <span>Recording length: {formatTime(recordingTime)}</span>
+          {advancedOpen && (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="notes">Notes</Label>
+                <Textarea 
+                  id="notes" 
+                  name="notes"
+                  value={notes} 
+                  onChange={(e) => setNotes(e.target.value)} 
+                  placeholder="Add notes about this recording"
+                  rows={3}
+                  disabled={isUploading || isSubmitting}
+                />
+              </div>
+              <div>
+                <Label htmlFor="tags">Tags (comma-separated)</Label>
+                <Input 
+                  id="tags" 
+                  name="tags"
+                  value={tags} 
+                  onChange={(e) => setTags(e.target.value)} 
+                  placeholder="e.g. solo, act1, blocking"
+                  disabled={isUploading || isSubmitting}
+                />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
       
-      <Button 
-        onClick={onSaveRecording} 
-        className="w-full" 
-        disabled={isUploading || !title || !selectedRehearsal}
-      >
-        <Save className="mr-2 h-4 w-4" />
-        {uploadComplete ? "Saved" : isUploading ? "Uploading..." : "Save Recording"}
-      </Button>
+      <div className="mt-6">
+        <Button 
+          type="submit" 
+          className="w-full"
+          disabled={isUploading || isSubmitting}
+          onClick={handleSubmit}
+        >
+          <Save className="mr-2 h-4 w-4" />
+          Save Recording
+        </Button>
+        
+        {(isUploading || isSubmitting) && (
+          <p className="text-xs text-center mt-2 text-muted-foreground">
+            Please don't navigate away while saving...
+          </p>
+        )}
+      </div>
     </div>
   );
 }

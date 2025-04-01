@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { googleDriveService } from "@/services/googleDriveService";
 import { recordingService } from "@/services/recordingService";
@@ -19,12 +19,14 @@ export const useUpload = ({ recordingTime }: UseUploadProps) => {
   const [uploadPhase, setUploadPhase] = useState<UploadPhase>('preparing');
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [selectedRehearsal, setSelectedRehearsal] = useState<string | null>(null);
   
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  const handleRetry = (saveRecordingFn: () => void) => {
+  const handleRetry = useCallback((saveRecordingFn: () => void) => {
     if (retryCount < 3) {
+      console.log(`Retrying upload, attempt ${retryCount + 1}/3`);
       setRetryCount(prev => prev + 1);
       setUploadProgress(0);
       setUploadPhase('preparing');
@@ -37,9 +39,20 @@ export const useUpload = ({ recordingTime }: UseUploadProps) => {
         variant: "destructive",
       });
     }
-  };
+  }, [retryCount, toast]);
   
-  const saveRecording = async (recordedBlob: Blob, formElement: HTMLFormElement) => {
+  const resetUploadState = useCallback(() => {
+    console.log("Resetting upload state");
+    setIsLoading(false);
+    setIsUploading(false);
+    setUploadProgress(0);
+    setUploadPhase('preparing');
+    setUploadError(null);
+    setRetryCount(0);
+    setUploadComplete(false);
+  }, []);
+  
+  const saveRecording = useCallback(async (recordedBlob: Blob, formElement: HTMLFormElement) => {
     if (!formElement) {
       toast({
         title: "Form error",
@@ -49,12 +62,16 @@ export const useUpload = ({ recordingTime }: UseUploadProps) => {
       return;
     }
     
+    // Process form data
     const formData = new FormData(formElement);
     const title = formData.get("title") as string;
     const selectedRehearsal = formData.get("rehearsal") as string;
     const notes = formData.get("notes") as string;
     const tags = formData.get("tags") as string;
     
+    console.log("Form data:", { title, selectedRehearsal, notes, tags });
+    
+    // Validate form data
     if (!title) {
       toast({
         title: "Title required",
@@ -82,27 +99,37 @@ export const useUpload = ({ recordingTime }: UseUploadProps) => {
       return;
     }
     
+    // Store the selected rehearsal to use for navigation after upload
+    setSelectedRehearsal(selectedRehearsal);
+    
+    // Start upload process
     setIsLoading(true);
     setIsUploading(true);
     setUploadPhase('preparing');
     setUploadError(null);
     
     try {
+      console.log("Starting recording upload process");
+      
+      // Prepare file details
       const fileExtension = "webm";
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
       const fileName = `${title.replace(/[^a-z0-9]/gi, "_")}_${timestamp}.${fileExtension}`;
       
+      console.log("Upload file name:", fileName);
       setUploadPhase('uploading');
       
       console.log("Uploading video to Google Drive");
       
+      // Upload to Google Drive
       const driveFile = await googleDriveService.uploadVideo(
         recordedBlob,
         fileName,
-        "Performance", // Will be updated with the actual performance title when saving to the database
-        "Rehearsal",   // Will be updated with the actual rehearsal title when saving to the database
+        "Performance", // Will be updated with the actual performance title
+        "Rehearsal",   // Will be updated with the actual rehearsal title
         (progress) => {
           setUploadProgress(progress);
+          console.log(`Upload progress: ${progress}%`);
         }
       );
       
@@ -110,15 +137,20 @@ export const useUpload = ({ recordingTime }: UseUploadProps) => {
         throw new Error("Failed to upload video to Google Drive");
       }
       
+      console.log("Video uploaded to Google Drive:", driveFile);
       setUploadPhase('processing');
       
+      // Simulate processing time
       await new Promise(resolve => setTimeout(resolve, 1500));
       
       setUploadPhase('saving');
       
+      // Process tags
       const tagsArray = tags ? tags.split(',').map(tag => tag.trim()).filter(tag => tag !== '') : [];
+      console.log("Processed tags:", tagsArray);
       
-      await recordingService.createRecording({
+      // Save to database
+      const savedRecording = await recordingService.createRecording({
         rehearsalId: selectedRehearsal,
         title: title,
         notes: notes || undefined,
@@ -129,6 +161,7 @@ export const useUpload = ({ recordingTime }: UseUploadProps) => {
         googleFileId: driveFile.id
       });
       
+      console.log("Recording saved to database:", savedRecording);
       setUploadPhase('complete');
       setUploadComplete(true);
       
@@ -137,7 +170,11 @@ export const useUpload = ({ recordingTime }: UseUploadProps) => {
         description: "Your recording has been successfully uploaded to Google Drive and saved.",
       });
       
-      navigate(`/rehearsals/${selectedRehearsal}`);
+      // Delay navigation to ensure message is displayed
+      setTimeout(() => {
+        console.log(`Navigating to /rehearsals/${selectedRehearsal}`);
+        navigate(`/rehearsals/${selectedRehearsal}`);
+      }, 1500);
       
     } catch (error) {
       console.error("Error saving recording:", error);
@@ -153,7 +190,7 @@ export const useUpload = ({ recordingTime }: UseUploadProps) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [navigate, recordingTime, toast]);
   
   return {
     isLoading,
@@ -163,8 +200,10 @@ export const useUpload = ({ recordingTime }: UseUploadProps) => {
     uploadPhase,
     uploadError,
     retryCount,
+    selectedRehearsal,
     saveRecording,
     handleRetry,
+    resetUploadState,
     setUploadProgress
   };
 };

@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -10,7 +9,8 @@ import {
   getUserMediaWithTimeout,
   getMobileStreamWithTimeout,
   tryMediaWithFallback,
-  getScreenShareWithAudio
+  getScreenShareWithAudio,
+  emergencyMediaFallback
 } from "@/utils/cameraUtils";
 
 interface UseCameraOptions {
@@ -29,6 +29,7 @@ export const useCamera = (options?: UseCameraOptions) => {
   const [permissionState, setPermissionState] = useState<PermissionState | null>(null);
   const [isPermissionPermanentlyDenied, setIsPermissionPermanentlyDenied] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [isMobile, setIsMobile] = useState<boolean>(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -37,7 +38,15 @@ export const useCamera = (options?: UseCameraOptions) => {
   const { toast } = useToast();
   const debug = options?.enableDebugLogging !== false;
   
-  // Logging utility
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      setIsMobile(mobile);
+      console.log('[CAMERA-DEBUG] Device is mobile:', mobile);
+    };
+    checkMobile();
+  }, []);
+  
   const logDebug = (message: string, data?: any) => {
     if (!debug) return;
     
@@ -46,22 +55,18 @@ export const useCamera = (options?: UseCameraOptions) => {
     console.log(logMessage, data);
   };
 
-  // Check permission status
   const checkPermissionStatus = async () => {
     try {
       logDebug("Checking camera permission status");
       
-      // Check if the browser supports permissions API
       if (navigator.permissions) {
         const cameraPermission = await navigator.permissions.query({ name: 'camera' as PermissionName });
         setPermissionState(cameraPermission.state);
         
         logDebug(`Permission state: ${cameraPermission.state}`);
         
-        // Update permanent denial status
         setIsPermissionPermanentlyDenied(cameraPermission.state === 'denied');
         
-        // Listen for permission changes
         cameraPermission.addEventListener('change', () => {
           logDebug(`Permission state changed to: ${cameraPermission.state}`);
           setPermissionState(cameraPermission.state);
@@ -108,10 +113,8 @@ export const useCamera = (options?: UseCameraOptions) => {
     logDebug(`Camera access attempt #${attemptNumber}`, { deviceId });
     
     try {
-      // Check if we're on a mobile device
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       
-      // Use the deviceId if provided, otherwise use progressive fallbacks
       let stream: MediaStream;
       
       if (deviceId) {
@@ -126,14 +129,22 @@ export const useCamera = (options?: UseCameraOptions) => {
         
         logDebug(`Using specific device ID ${deviceId.substring(0, 10)}...`);
         stream = await getUserMediaWithTimeout(constraints, options?.timeoutDuration || 10000);
-      } else if (isMobile) {
-        // Use mobile-optimized constraints
+      } else if (isMobileDevice) {
         logDebug("Using mobile-optimized constraints");
         stream = await getMobileStreamWithTimeout();
       } else {
-        // Use our new handler with progressive fallbacks
-        logDebug("Using progressive fallbacks for desktop");
-        stream = await handleCameraTimeout(attemptNumber);
+        logDebug("Using enhanced fallback strategies");
+        const result = await tryMediaWithFallback();
+        stream = result.stream;
+        
+        if (result.isFallback) {
+          setUsingFallbackMode(true);
+          toast({
+            title: "Using fallback mode",
+            description: "Camera access was challenging. Using an alternative video source.",
+            duration: 5000,
+          });
+        }
       }
       
       logDebug("Camera access successful", {
@@ -147,7 +158,24 @@ export const useCamera = (options?: UseCameraOptions) => {
       if (attemptNumber < 3) {
         logDebug(`Trying again with attempt #${attemptNumber + 1}`);
         setRetryCount(attemptNumber);
+        
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         return tryAccessCamera(attemptNumber + 1, deviceId);
+      }
+      
+      if (attemptNumber === 3) {
+        logDebug("Trying emergency fallback as last resort");
+        const emergencyStream = await emergencyMediaFallback();
+        if (emergencyStream) {
+          setUsingFallbackMode(true);
+          toast({
+            title: "Using emergency fallback mode",
+            description: "Camera access was problematic. Using a limited emergency mode.",
+            duration: 5000,
+          });
+          return emergencyStream;
+        }
       }
       
       throw error;
@@ -156,7 +184,6 @@ export const useCamera = (options?: UseCameraOptions) => {
   
   const resetPermissions = useCallback(() => {
     logDebug("Resetting permissions manually");
-    // We can only guide the user to reset permissions manually
     openBrowserPermissionSettings();
     
     toast({
@@ -173,30 +200,31 @@ export const useCamera = (options?: UseCameraOptions) => {
       setIsInitializingCamera(true);
       setUsingFallbackMode(false);
       
-      // Clear any existing timeouts
       if (timeoutRef.current) {
         logDebug("Clearing previous timeout");
         window.clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
       
-      // Stop any existing stream
       if (streamRef.current) {
         logDebug("Stopping existing stream");
-        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current.getTracks().forEach(track => {
+          track.stop();
+          logDebug(`Stopped track: ${track.kind}:${track.label}`);
+        });
         streamRef.current = null;
       }
       
-      // Check permission status first
       const permissionState = await checkPermissionStatus();
       logDebug("Permission state", permissionState);
       
-      // If permissions are already denied, show helpful message
       if (permissionState === 'denied') {
         logDebug("Permission already denied");
         setIsPermissionPermanentlyDenied(true);
         throw new Error("Camera access is permanently denied. Please update your browser settings.");
       }
+      
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       const stream = await tryAccessCamera(1, deviceId);
       
@@ -226,9 +254,8 @@ export const useCamera = (options?: UseCameraOptions) => {
         
         if (error.name === "NotAllowedError") {
           errorMessage = "Camera access denied. Please allow access in your browser settings and try again.";
-          await checkPermissionStatus(); // Update permission state
+          await checkPermissionStatus();
           
-          // Check if this is likely a permanent denial
           const isPermanent = await isCameraPermissionPersistentlyDenied();
           setIsPermissionPermanentlyDenied(isPermanent);
           
@@ -260,12 +287,10 @@ export const useCamera = (options?: UseCameraOptions) => {
   const switchCamera = useCallback(async () => {
     logDebug("Switching camera");
     
-    // Stop existing camera stream
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
     }
     
-    // Update camera selection to next available camera
     const cameras = await enumerateDevices();
     if (cameras.length <= 1) {
       logDebug("Only one camera available, can't switch");
@@ -302,7 +327,6 @@ export const useCamera = (options?: UseCameraOptions) => {
       const capabilities = videoTrack.getCapabilities();
       logDebug("Track capabilities", capabilities);
       
-      // Check if the torch capability exists before accessing it
       if (!capabilities || typeof capabilities === 'undefined' || !('torch' in capabilities)) {
         logDebug("Flash not supported by this camera");
         toast({
@@ -316,7 +340,6 @@ export const useCamera = (options?: UseCameraOptions) => {
       const newFlashState = !flashEnabled;
       logDebug(`Setting flash to ${newFlashState}`);
       
-      // Use type assertion to avoid TypeScript error for the torch property
       const advancedConstraints = [{} as MediaTrackConstraintSet];
       (advancedConstraints[0] as any).torch = newFlashState;
       
@@ -342,6 +365,7 @@ export const useCamera = (options?: UseCameraOptions) => {
   
   const stopCamera = useCallback(() => {
     logDebug("Stopping camera");
+    
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => {
         logDebug(`Stopping track: ${track.kind}:${track.label}`);
@@ -350,9 +374,23 @@ export const useCamera = (options?: UseCameraOptions) => {
       streamRef.current = null;
     }
     
-    // Also stop any video element
+    if (timeoutRef.current) {
+      window.clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    
+    setCameraAccessError(null);
+    setIsInitializingCamera(false);
+    
     if (videoRef.current) {
       videoRef.current.srcObject = null;
+      videoRef.current.src = "";
+      
+      try {
+        videoRef.current.load();
+      } catch (e) {
+        // Ignore errors from load()
+      }
     }
   }, []);
   
@@ -362,13 +400,11 @@ export const useCamera = (options?: UseCameraOptions) => {
       setCameraAccessError(null);
       setIsInitializingCamera(true);
       
-      // Stop any existing stream
       if (streamRef.current) {
         logDebug("Stopping existing stream before screen share");
         streamRef.current.getTracks().forEach(track => track.stop());
       }
       
-      // Use our enhanced screen share function
       const displayStream = await getScreenShareWithAudio();
       
       logDebug("Screen sharing initialized", {
@@ -412,18 +448,15 @@ export const useCamera = (options?: UseCameraOptions) => {
     }
   }, [toast]);
   
-  // Clean up on unmount
   useEffect(() => {
     logDebug("Running camera initialization and compatibility check");
     const compatibility = checkBrowserCompatibility();
     
-    // Automatically enumerate devices on mount
     enumerateDevices();
     
     return () => {
       logDebug("Cleaning up camera resources");
       stopCamera();
-      // Clear any pending timeouts
       if (timeoutRef.current) {
         window.clearTimeout(timeoutRef.current);
       }
@@ -450,6 +483,7 @@ export const useCamera = (options?: UseCameraOptions) => {
     setCameraAccessError,
     resetPermissions,
     checkPermissionStatus,
-    retryCount
+    retryCount,
+    isMobile
   };
 };
