@@ -2,10 +2,32 @@
 import { Recording } from "@/types";
 import { dataService } from "./dataService";
 
+// Define data types for creating and updating recordings
+export interface CreateRecordingData {
+  rehearsalId: string;
+  title: string;
+  videoUrl?: string;
+  thumbnailUrl?: string;
+  duration?: number;
+  notes?: string;
+  tags?: string[];
+  googleFileId?: string;
+}
+
+export interface UpdateRecordingData {
+  title?: string;
+  videoUrl?: string;
+  thumbnailUrl?: string;
+  duration?: number;
+  notes?: string;
+  tags?: string[];
+  googleFileId?: string;
+}
+
 const getRecentRecordings = async (limit: number = 3): Promise<Recording[]> => {
   try {
     const response = await dataService.get(`/recordings?_sort=createdAt:DESC&_limit=${limit}`);
-    return response || [];
+    return Array.isArray(response) ? response : [];
   } catch (error) {
     console.error("Error fetching recent recordings:", error);
     return [];
@@ -33,7 +55,7 @@ const getRecordingsByRehearsalId = async (rehearsalId: string): Promise<Recordin
   }
 };
 
-const createRecording = async (recording: Recording): Promise<Recording | null> => {
+const createRecording = async (recording: CreateRecordingData): Promise<Recording | null> => {
   try {
     const response = await dataService.post('/recordings', recording);
     return response || null;
@@ -43,7 +65,7 @@ const createRecording = async (recording: Recording): Promise<Recording | null> 
   }
 };
 
-const updateRecording = async (id: string, recording: Partial<Recording>): Promise<Recording | null> => {
+const updateRecording = async (id: string, recording: UpdateRecordingData): Promise<Recording | null> => {
   try {
     const response = await dataService.put(`/recordings/${id}`, recording);
     return response || null;
@@ -66,7 +88,7 @@ const deleteRecording = async (id: string): Promise<boolean> => {
 const getAllRecordings = async (): Promise<Recording[]> => {
   try {
     const response = await dataService.get('/recordings');
-    return response || [];
+    return Array.isArray(response) ? response : [];
   } catch (error) {
     console.error('Error fetching all recordings:', error);
     return [];

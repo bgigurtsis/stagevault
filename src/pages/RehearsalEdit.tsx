@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -43,11 +42,7 @@ export default function RehearsalEdit() {
     if (!rehearsalId) return;
     
     try {
-      // Pass the data as a single UpdateRehearsalData object instead of separate params
-      await rehearsalService.updateRehearsal({
-        id: rehearsalId,
-        ...updatedData
-      });
+      await rehearsalService.updateRehearsal(rehearsalId, updatedData);
       
       toast({
         title: "Success",

@@ -56,6 +56,7 @@ export default function RehearsalNew() {
 
     setLoading(true);
     try {
+      // Use the CreateRehearsalData interface explicitly
       await rehearsalService.createRehearsal({
         title: rehearsal.title,
         description: rehearsal.description,

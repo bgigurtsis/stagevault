@@ -1,5 +1,4 @@
 
-
 import { Performance, Rehearsal, Recording } from "@/types";
 import { performanceService, CreatePerformanceData, UpdatePerformanceData } from "./performanceService";
 import { rehearsalService, CreateRehearsalData, UpdateRehearsalData } from "./rehearsalService";
@@ -52,8 +51,8 @@ class DataService {
   }
   
   // Update to match the signature in rehearsalService
-  updateRehearsal(rehearsalData: UpdateRehearsalData): Promise<Rehearsal | null> {
-    return rehearsalService.updateRehearsal(rehearsalData);
+  updateRehearsal(id: string, rehearsalData: Partial<Rehearsal>): Promise<Rehearsal | null> {
+    return rehearsalService.updateRehearsal(id, rehearsalData);
   }
   
   deleteRehearsal(id: string): Promise<boolean> {

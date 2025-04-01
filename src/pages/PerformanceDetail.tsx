@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -37,6 +36,7 @@ export default function PerformanceDetail() {
   const [activeTab, setActiveTab] = useState("overview");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [rehearsals, setRehearsals] = useState<Rehearsal[]>([]);
 
   // Fetch performance details
   const {
@@ -54,6 +54,29 @@ export default function PerformanceDetail() {
     },
     enabled: !!performanceId
   });
+
+  useEffect(() => {
+    const fetchRehearsals = async () => {
+      if (performance) {
+        setIsLoadingRehearsals(true);
+        try {
+          const data = await rehearsalService.getRehearsalsByPerformance(performance.id);
+          setRehearsals(data);
+        } catch (error) {
+          console.error("Error fetching rehearsals:", error);
+          toast({
+            title: "Error",
+            description: "Failed to load rehearsals. Please try again.",
+            variant: "destructive",
+          });
+        } finally {
+          setIsLoadingRehearsals(false);
+        }
+      }
+    };
+
+    fetchRehearsals();
+  }, [performance, toast]);
 
   // Fetch rehearsals for this performance
   const {
