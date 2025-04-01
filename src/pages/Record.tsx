@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { Video, ArrowLeft } from "lucide-react";
@@ -59,7 +60,8 @@ export default function Record() {
   } = useCamera({
     onCameraError: (error) => {
       console.log("Camera error handler called:", error);
-    }
+    },
+    enableDebugLogging: true
   });
   
   const {
@@ -173,12 +175,12 @@ export default function Record() {
       
       checkBrowserCompatibility();
       
-      // Use a timeout to allow the component to fully mount
+      // Use a longer timeout to allow the component to fully mount
       initTimer = window.setTimeout(() => {
         startCamera();
         checkPermissionStatus();
         setCameraInitialized(true);
-      }, 500);
+      }, 1000);
       
       // Force fullscreen mode on mobile
       if (isMobile) {
@@ -242,10 +244,16 @@ export default function Record() {
 
   // Handle retry camera access with tracking to prevent infinite loops
   const handleRetryCamera = () => {
-    setCameraAccessError(null);
-    setRetryAttempts(prev => prev + 1);
-    setCameraInitialized(false);
-    startCamera();
+    // Ensure previous camera resources are released
+    stopCamera();
+    
+    // Wait a moment before retrying
+    setTimeout(() => {
+      setCameraAccessError(null);
+      setRetryAttempts(prev => prev + 1);
+      setCameraInitialized(false);
+      startCamera();
+    }, 1000);
   };
   
   // Handle "go back" navigation
@@ -359,6 +367,7 @@ export default function Record() {
                   onSwitchCamera={switchCamera}
                   onToggleFlash={toggleFlash}
                   flashEnabled={flashEnabled}
+                  stream={streamRef.current}
                 />
                 
                 <RecordingControls 
@@ -391,6 +400,7 @@ export default function Record() {
                   onSwitchCamera={switchCamera}
                   onToggleFlash={toggleFlash}
                   flashEnabled={flashEnabled}
+                  stream={streamRef.current}
                 />
               </div>
             )}

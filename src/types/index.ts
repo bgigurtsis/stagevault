@@ -1,17 +1,18 @@
-
 import { User } from "../contexts/types";
 
 export interface Performance {
   id: string;
   title: string;
   description?: string;
-  startDate?: string;
-  endDate?: string;
+  startDate: string;
+  endDate: string;
   createdAt: string;
   updatedAt: string;
-  createdBy: string;
-  taggedUsers?: string[];
-  driveFolderId?: string;
+  status: PerformanceStatus;
+  venue?: string;
+  coverImage?: string | null;
+  userId: string;
+  patternType?: string;
 }
 
 export interface Rehearsal {

@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -22,6 +23,7 @@ interface UseCameraOptions {
 
 export const useCamera = (options?: UseCameraOptions) => {
   const [isInitializingCamera, setIsInitializingCamera] = useState(false);
+  const [isStartingCamera, setIsStartingCamera] = useState(false);
   const [cameraAccessError, setCameraAccessError] = useState<string | null>(null);
   const [selectedCameraId, setSelectedCameraId] = useState<string>("");
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
@@ -110,37 +112,79 @@ export const useCamera = (options?: UseCameraOptions) => {
     }
   };
   
-  const tryAccessCamera = async (attemptNumber = 1, deviceId?: string): Promise<MediaStream> => {
-    logDebug(`Camera access attempt #${attemptNumber}`, { deviceId });
+  // New implementation using video-first strategy
+  const acquireMediaStream = async (deviceId?: string): Promise<MediaStream> => {
+    logDebug("Using video-first strategy for acquiring media stream", { deviceId });
     
+    // Step 1: Try to get video-only stream first
     try {
-      logDebug("Using video-only strategy as primary method");
-      return await getVideoOnlyStream();
-    } catch (error) {
-      logDebug(`Video-only strategy failed`, error);
+      const videoConstraints: MediaTrackConstraints = {
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      };
       
-      if (attemptNumber < 2) {
-        logDebug(`Trying again with attempt #${attemptNumber + 1}`);
-        setRetryCount(attemptNumber);
-        
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        return tryAccessCamera(attemptNumber + 1, deviceId);
+      if (deviceId) {
+        videoConstraints.deviceId = { exact: deviceId };
       }
       
-      logDebug("Falling back to emergency strategies");
-      const emergencyStream = await emergencyMediaFallback();
-      if (emergencyStream) {
-        setUsingFallbackMode(true);
-        toast({
-          title: "Camera access successful",
-          description: "Using simplified video mode.",
-          duration: 2000,
+      const videoOnlyStream = await navigator.mediaDevices.getUserMedia({
+        video: videoConstraints,
+        audio: false
+      });
+      
+      logDebug("Video-only stream acquired successfully");
+      
+      // Step 2: Try to get audio-only stream and add it to the video stream
+      try {
+        logDebug("Attempting to add audio track to video stream");
+        const audioOnlyStream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: false
         });
-        return emergencyStream;
+        
+        const audioTrack = audioOnlyStream.getAudioTracks()[0];
+        videoOnlyStream.addTrack(audioTrack);
+        logDebug("Audio track added to video stream successfully");
+        
+        return videoOnlyStream;
+      } catch (audioError) {
+        logDebug("Failed to add audio track, continuing with video-only", audioError);
+        // Continue with video-only if audio fails
+        return videoOnlyStream;
       }
+    } catch (videoError) {
+      logDebug("Video-first strategy failed", videoError);
       
-      throw error;
+      // Fallback: Try the all-in-one approach
+      try {
+        logDebug("Falling back to combined audio+video request");
+        const combinedConstraints: MediaStreamConstraints = {
+          video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: true
+        };
+        
+        if (deviceId) {
+          (combinedConstraints.video as MediaTrackConstraints).deviceId = { exact: deviceId };
+        }
+        
+        const combinedStream = await navigator.mediaDevices.getUserMedia(combinedConstraints);
+        logDebug("Combined audio+video stream acquired successfully");
+        return combinedStream;
+      } catch (combinedError) {
+        logDebug("Combined audio+video request failed", combinedError);
+        
+        // Last resort: Try emergency fallbacks
+        const emergencyStream = await emergencyMediaFallback();
+        if (emergencyStream) {
+          logDebug("Emergency fallback stream acquired");
+          return emergencyStream;
+        }
+        
+        throw new Error("Failed to acquire any media stream");
+      }
     }
   };
   
@@ -155,9 +199,52 @@ export const useCamera = (options?: UseCameraOptions) => {
     });
   }, [toast]);
   
+  const stopCamera = useCallback(() => {
+    logDebug("Stopping camera");
+    
+    if (streamRef.current) {
+      const tracks = streamRef.current.getTracks();
+      logDebug(`Stopping ${tracks.length} tracks`);
+      
+      tracks.forEach(track => {
+        logDebug(`Stopping track: ${track.kind}:${track.label}`);
+        track.stop();
+      });
+      streamRef.current = null;
+    }
+    
+    if (timeoutRef.current) {
+      logDebug("Clearing previous timeout");
+      window.clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    
+    setCameraAccessError(null);
+    setIsInitializingCamera(false);
+    setIsStartingCamera(false);
+    
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+      videoRef.current.src = "";
+      
+      try {
+        videoRef.current.load();
+      } catch (e) {
+        // Ignore errors from load()
+      }
+    }
+  }, []);
+  
   const startCamera = useCallback(async (deviceId?: string) => {
+    // Prevent concurrent initialization
+    if (isStartingCamera) {
+      logDebug("Camera initialization already in progress, ignoring request");
+      return;
+    }
+    
     try {
       logDebug("Starting camera", { deviceId });
+      setIsStartingCamera(true);
       setCameraAccessError(null);
       setIsInitializingCamera(true);
       setUsingFallbackMode(false);
@@ -168,6 +255,7 @@ export const useCamera = (options?: UseCameraOptions) => {
         timeoutRef.current = null;
       }
       
+      // Ensure any existing stream is properly stopped
       if (streamRef.current) {
         logDebug("Stopping existing stream");
         streamRef.current.getTracks().forEach(track => {
@@ -186,9 +274,11 @@ export const useCamera = (options?: UseCameraOptions) => {
         throw new Error("Camera access is permanently denied. Please update your browser settings.");
       }
       
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Small delay to ensure resources are released
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      const stream = await tryAccessCamera(1, deviceId);
+      // Use the new video-first strategy
+      const stream = await acquireMediaStream(deviceId);
       
       setIsInitializingCamera(false);
       streamRef.current = stream;
@@ -227,9 +317,9 @@ export const useCamera = (options?: UseCameraOptions) => {
         } else if (error.name === "NotFoundError") {
           errorMessage = "No camera detected. Please connect a camera and try again.";
         } else if (error.name === "NotReadableError") {
-          errorMessage = "Camera is in use by another application. Please close other apps using your camera.";
-        } else if (error.message.includes("Timeout")) {
-          errorMessage = "Timeout starting video source. Please try again or use a different camera.";
+          errorMessage = "Camera is in use by another application. Please close other apps using your camera and try again.";
+        } else if (error.name === "AbortError" || error.message.includes("Timeout")) {
+          errorMessage = "Timeout starting video source. Please check your camera connection or try a different camera.";
         }
       }
       
@@ -243,15 +333,19 @@ export const useCamera = (options?: UseCameraOptions) => {
         description: errorMessage,
         variant: "destructive",
       });
+    } finally {
+      setIsStartingCamera(false);
     }
-  }, [toast, options, checkPermissionStatus]);
+  }, [toast, options, checkPermissionStatus, isStartingCamera]);
   
   const switchCamera = useCallback(async () => {
     logDebug("Switching camera");
     
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-    }
+    // Ensure current stream is completely stopped
+    stopCamera();
+    
+    // Wait a moment to allow resources to be released
+    await new Promise(resolve => setTimeout(resolve, 500));
     
     const cameras = await enumerateDevices();
     if (cameras.length <= 1) {
@@ -271,7 +365,7 @@ export const useCamera = (options?: UseCameraOptions) => {
     logDebug(`Switching from camera ${currentIndex} to camera ${nextIndex}`);
     setSelectedCameraId(nextCamera.deviceId);
     startCamera(nextCamera.deviceId);
-  }, [selectedCameraId, startCamera, enumerateDevices, toast]);
+  }, [selectedCameraId, startCamera, enumerateDevices, toast, stopCamera]);
   
   const toggleFlash = useCallback(async () => {
     if (!streamRef.current) {
@@ -325,47 +419,18 @@ export const useCamera = (options?: UseCameraOptions) => {
     }
   }, [flashEnabled, toast]);
   
-  const stopCamera = useCallback(() => {
-    logDebug("Stopping camera");
-    
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => {
-        logDebug(`Stopping track: ${track.kind}:${track.label}`);
-        track.stop();
-      });
-      streamRef.current = null;
-    }
-    
-    if (timeoutRef.current) {
-      window.clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    
-    setCameraAccessError(null);
-    setIsInitializingCamera(false);
-    
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-      videoRef.current.src = "";
-      
-      try {
-        videoRef.current.load();
-      } catch (e) {
-        // Ignore errors from load()
-      }
-    }
-  }, []);
-  
   const attemptScreenshareWithCamera = useCallback(async () => {
     try {
       logDebug("Attempting screenshare fallback");
+      
+      // Ensure any existing stream is stopped
+      stopCamera();
+      
+      // Wait for resources to be released
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       setCameraAccessError(null);
       setIsInitializingCamera(true);
-      
-      if (streamRef.current) {
-        logDebug("Stopping existing stream before screen share");
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
       
       const displayStream = await getScreenShareWithAudio();
       
@@ -408,7 +473,7 @@ export const useCamera = (options?: UseCameraOptions) => {
       
       throw error;
     }
-  }, [toast]);
+  }, [toast, stopCamera]);
   
   useEffect(() => {
     logDebug("Running camera initialization and compatibility check");
