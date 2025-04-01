@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { 
   Save, 
@@ -217,8 +218,8 @@ export function RecordingForm({
   }, [selectedPerformance, selectedRehearsal]);
 
   // Enhanced create performance function with better error handling
-  const createPerformanceHandler = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCreatePerformance = async (e?: React.MouseEvent) => {
+    e?.preventDefault();
     
     if (!newPerformanceTitle.trim()) {
       toast({
@@ -245,8 +246,7 @@ export function RecordingForm({
       const newPerformance = await performanceService.createPerformance({
         title: newPerformanceTitle,
         startDate: new Date().toISOString().split('T')[0],
-        createdBy: user?.id || "",
-        userId: user?.id || ""
+        createdBy: user.id // Use the actual user ID instead of "current-user"
       });
       
       console.log("New performance created:", newPerformance);
@@ -279,8 +279,8 @@ export function RecordingForm({
   };
   
   // Enhanced create rehearsal function with better error handling
-  const handleCreateRehearsal = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCreateRehearsal = async (e?: React.MouseEvent) => {
+    e?.preventDefault();
     
     if (!selectedPerformance) {
       toast({
@@ -452,7 +452,7 @@ export function RecordingForm({
                       type="button" 
                       size="sm" 
                       variant="default"
-                      onClick={createPerformanceHandler}
+                      onClick={handleCreatePerformance}
                       disabled={isUploading || isSubmitting}
                     >
                       Create

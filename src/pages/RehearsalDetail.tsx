@@ -14,7 +14,6 @@ import { format, parseISO } from "date-fns";
 import { ArrowLeft, Calendar, MapPin, Pencil, Trash, Video, Users, Clock, Tag, Plus, Play, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-
 export default function RehearsalDetail() {
   const [rehearsal, setRehearsal] = useState<Rehearsal | null>(null);
   const [performance, setPerformance] = useState<Performance | null>(null);
@@ -33,7 +32,6 @@ export default function RehearsalDetail() {
   const {
     toast
   } = useToast();
-
   useEffect(() => {
     const fetchRehearsalData = async () => {
       if (!rehearsalId) return;
@@ -65,7 +63,6 @@ export default function RehearsalDetail() {
     };
     fetchRehearsalData();
   }, [rehearsalId, navigate, toast]);
-
   const handleDeleteRehearsal = async () => {
     if (!rehearsalId) return;
     try {
@@ -84,7 +81,6 @@ export default function RehearsalDetail() {
       });
     }
   };
-
   const handleDeleteRecording = async (recordingId: string) => {
     try {
       await recordingService.deleteRecording(recordingId);
@@ -105,19 +101,16 @@ export default function RehearsalDetail() {
       });
     }
   };
-
   const formatDuration = (seconds?: number) => {
     if (!seconds) return "00:00";
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
-
   const openVideoDialog = (recording: Recording) => {
     setSelectedRecording(recording);
     setVideoDialogOpen(true);
   };
-
   if (loading) {
     return <div className="container py-6 space-y-8">
         <div className="flex items-center gap-4">
@@ -128,7 +121,6 @@ export default function RehearsalDetail() {
         <Skeleton className="h-[300px] w-full" />
       </div>;
   }
-
   if (!rehearsal) {
     return <div className="container py-6">
         <p>Rehearsal not found</p>
@@ -137,7 +129,6 @@ export default function RehearsalDetail() {
         </Button>
       </div>;
   }
-
   return <div className="container py-6 space-y-8">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => rehearsal.performanceId ? navigate(`/performances/${rehearsal.performanceId}`) : navigate("/rehearsals")}>

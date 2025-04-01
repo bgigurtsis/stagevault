@@ -1,6 +1,4 @@
-
-// Let's update the Performance and Recording types to match what's being used
-export type PerformanceStatus = "upcoming" | "active" | "completed" | "canceled";
+import { User } from "../contexts/types";
 
 export interface Performance {
   id: string;
@@ -14,9 +12,7 @@ export interface Performance {
   venue?: string;
   coverImage?: string | null;
   userId: string;
-  taggedUsers?: string[];
-  createdBy?: string;
-  driveFolderId?: string | null;
+  patternType?: string;
 }
 
 export interface Rehearsal {
@@ -47,7 +43,6 @@ export interface Recording {
   blob?: Blob;
   isUploading?: boolean;
   uploadProgress?: number;
-  googleFileId?: string;
 }
 
 // Empty mock data for performances

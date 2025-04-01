@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -19,10 +20,19 @@ import RehearsalCard from "@/components/RehearsalCard";
 import { MapPin } from "lucide-react";
 
 export default function PerformanceDetail() {
-  const { performanceId } = useParams<{ performanceId: string }>();
+  const {
+    performanceId
+  } = useParams<{
+    performanceId: string;
+  }>();
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const { users, currentUser } = useAuth();
+  const {
+    toast
+  } = useToast();
+  const {
+    users,
+    currentUser
+  } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("overview");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -140,7 +150,6 @@ export default function PerformanceDetail() {
 
   // Get the most recent rehearsal (if any)
   const latestRehearsal = sortedRehearsals.length > 0 ? sortedRehearsals[0] : undefined;
-
   if (isLoadingPerformance) {
     return <div className="container py-6 space-y-6">
         <div className="flex items-center gap-2">

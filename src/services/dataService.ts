@@ -51,8 +51,8 @@ class DataService {
   }
   
   // Update to match the signature in rehearsalService
-  updateRehearsal(id: string, rehearsalData: Partial<Rehearsal>): Promise<Rehearsal | null> {
-    return rehearsalService.updateRehearsal(id, rehearsalData);
+  updateRehearsal(rehearsalData: UpdateRehearsalData): Promise<Rehearsal | null> {
+    return rehearsalService.updateRehearsal(rehearsalData);
   }
   
   deleteRehearsal(id: string): Promise<boolean> {
@@ -69,7 +69,7 @@ class DataService {
   }
   
   // Recording methods
-  getRecentRecordings(limit: number = 5): Promise<Recording[]> {
+  getRecentRecordings(limit?: number): Promise<Recording[]> {
     return recordingService.getRecentRecordings(limit);
   }
   
@@ -85,53 +85,12 @@ class DataService {
     return recordingService.createRecording(recordingData);
   }
   
-  updateRecording(id: string, recordingData: UpdateRecordingData): Promise<Recording | null> {
-    return recordingService.updateRecording(id, recordingData);
+  updateRecording(recordingData: UpdateRecordingData): Promise<Recording | null> {
+    return recordingService.updateRecording(recordingData);
   }
   
   deleteRecording(id: string): Promise<boolean> {
     return recordingService.deleteRecording(id);
-  }
-
-  // Generic data methods
-  async get<T>(endpoint: string): Promise<T | null> {
-    try {
-      // Implementation for HTTP GET requests
-      return null as unknown as T; // Placeholder
-    } catch (error) {
-      console.error(`GET request failed for ${endpoint}:`, error);
-      return null;
-    }
-  }
-
-  async post<T>(endpoint: string, data: any): Promise<T | null> {
-    try {
-      // Implementation for HTTP POST requests
-      return null as unknown as T; // Placeholder
-    } catch (error) {
-      console.error(`POST request failed for ${endpoint}:`, error);
-      return null;
-    }
-  }
-
-  async put<T>(endpoint: string, data: any): Promise<T | null> {
-    try {
-      // Implementation for HTTP PUT requests
-      return null as unknown as T; // Placeholder
-    } catch (error) {
-      console.error(`PUT request failed for ${endpoint}:`, error);
-      return null;
-    }
-  }
-
-  async delete(endpoint: string): Promise<boolean> {
-    try {
-      // Implementation for HTTP DELETE requests
-      return true; // Placeholder
-    } catch (error) {
-      console.error(`DELETE request failed for ${endpoint}:`, error);
-      return false;
-    }
   }
 }
 

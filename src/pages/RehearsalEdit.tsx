@@ -39,11 +39,15 @@ export default function RehearsalEdit() {
     fetchRehearsal();
   }, [rehearsalId, navigate, toast]);
 
-  const handleUpdateRehearsal = async (updatedData: Partial<Rehearsal>) => {
+  const handleUpdateRehearsal = async (updatedData: Omit<Rehearsal, "id" | "createdAt" | "updatedAt">) => {
     if (!rehearsalId) return;
     
     try {
-      await rehearsalService.updateRehearsal(rehearsalId, updatedData);
+      // Pass the data as a single UpdateRehearsalData object instead of separate params
+      await rehearsalService.updateRehearsal({
+        id: rehearsalId,
+        ...updatedData
+      });
       
       toast({
         title: "Success",
