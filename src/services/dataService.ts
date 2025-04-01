@@ -50,8 +50,9 @@ class DataService {
     return rehearsalService.createRehearsal(rehearsalData);
   }
   
-  updateRehearsal(id: string, rehearsalData: Partial<CreateRehearsalData>): Promise<Rehearsal | null> {
-    return rehearsalService.updateRehearsal(id, rehearsalData);
+  // Update to match the signature in rehearsalService
+  updateRehearsal(rehearsalData: UpdateRehearsalData): Promise<Rehearsal | null> {
+    return rehearsalService.updateRehearsal(rehearsalData);
   }
   
   deleteRehearsal(id: string): Promise<boolean> {

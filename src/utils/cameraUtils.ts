@@ -1,4 +1,5 @@
 
+// Import the v4 function from uuid package
 import { v4 as uuidv4 } from 'uuid';
 
 // Format time in mm:ss format
@@ -333,6 +334,7 @@ export const getCameraControlsSupport = async (stream: MediaStream): Promise<{
     const hasCapabilitiesApi = !!videoTrack.getCapabilities;
     const hasTorch = hasCapabilitiesApi && 
                     capabilities && 
+                    'torch' in capabilities && 
                     (capabilities as any).torch === true;
     
     return { flashSupported: !!hasTorch };
