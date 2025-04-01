@@ -19,24 +19,14 @@ import RehearsalCard from "@/components/RehearsalCard";
 import { MapPin } from "lucide-react";
 
 export default function PerformanceDetail() {
-  const {
-    performanceId
-  } = useParams<{
-    performanceId: string;
-  }>();
+  const { performanceId } = useParams<{ performanceId: string }>();
   const navigate = useNavigate();
-  const {
-    toast
-  } = useToast();
-  const {
-    users,
-    currentUser
-  } = useAuth();
+  const { toast } = useToast();
+  const { users, currentUser } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("overview");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [rehearsals, setRehearsals] = useState<Rehearsal[]>([]);
 
   // Fetch performance details
   const {
@@ -54,29 +44,6 @@ export default function PerformanceDetail() {
     },
     enabled: !!performanceId
   });
-
-  useEffect(() => {
-    const fetchRehearsals = async () => {
-      if (performance) {
-        setIsLoadingRehearsals(true);
-        try {
-          const data = await rehearsalService.getRehearsalsByPerformance(performance.id);
-          setRehearsals(data);
-        } catch (error) {
-          console.error("Error fetching rehearsals:", error);
-          toast({
-            title: "Error",
-            description: "Failed to load rehearsals. Please try again.",
-            variant: "destructive",
-          });
-        } finally {
-          setIsLoadingRehearsals(false);
-        }
-      }
-    };
-
-    fetchRehearsals();
-  }, [performance, toast]);
 
   // Fetch rehearsals for this performance
   const {
@@ -173,6 +140,7 @@ export default function PerformanceDetail() {
 
   // Get the most recent rehearsal (if any)
   const latestRehearsal = sortedRehearsals.length > 0 ? sortedRehearsals[0] : undefined;
+
   if (isLoadingPerformance) {
     return <div className="container py-6 space-y-6">
         <div className="flex items-center gap-2">

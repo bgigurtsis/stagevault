@@ -37,7 +37,7 @@ const getRecentRecordings = async (limit: number = 3): Promise<Recording[]> => {
 const getRecordingById = async (id: string): Promise<Recording | null> => {
   try {
     const response = await dataService.get(`/recordings/${id}`);
-    return response || null;
+    return response as Recording || null;
   } catch (error) {
     console.error(`Error fetching recording with ID ${id}:`, error);
     return null;
@@ -58,7 +58,7 @@ const getRecordingsByRehearsalId = async (rehearsalId: string): Promise<Recordin
 const createRecording = async (recording: CreateRecordingData): Promise<Recording | null> => {
   try {
     const response = await dataService.post('/recordings', recording);
-    return response || null;
+    return response as Recording || null;
   } catch (error) {
     console.error('Error creating recording:', error);
     return null;
@@ -68,7 +68,7 @@ const createRecording = async (recording: CreateRecordingData): Promise<Recordin
 const updateRecording = async (id: string, recording: UpdateRecordingData): Promise<Recording | null> => {
   try {
     const response = await dataService.put(`/recordings/${id}`, recording);
-    return response || null;
+    return response as Recording || null;
   } catch (error) {
     console.error(`Error updating recording with ID ${id}:`, error);
     return null;

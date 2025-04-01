@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -38,7 +39,7 @@ export default function RehearsalEdit() {
     fetchRehearsal();
   }, [rehearsalId, navigate, toast]);
 
-  const handleUpdateRehearsal = async (updatedData: Omit<Rehearsal, "id" | "createdAt" | "updatedAt">) => {
+  const handleUpdateRehearsal = async (updatedData: Partial<Rehearsal>) => {
     if (!rehearsalId) return;
     
     try {

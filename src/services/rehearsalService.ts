@@ -14,7 +14,6 @@ export interface CreateRehearsalData {
 }
 
 export interface UpdateRehearsalData {
-  id: string;
   performanceId?: string;
   title?: string;
   description?: string;
@@ -60,7 +59,7 @@ const getRehearsals = async (): Promise<Rehearsal[]> => {
 const getRehearsalById = async (id: string): Promise<Rehearsal | null> => {
   try {
     const response = await dataService.get(`/rehearsals/${id}`);
-    return response || null;
+    return response as Rehearsal || null;
   } catch (error) {
     console.error(`Error fetching rehearsal with ID ${id}:`, error);
     return null;
@@ -70,7 +69,7 @@ const getRehearsalById = async (id: string): Promise<Rehearsal | null> => {
 const createRehearsal = async (rehearsalData: CreateRehearsalData): Promise<Rehearsal | null> => {
   try {
     const response = await dataService.post('/rehearsals', rehearsalData);
-    return response || null;
+    return response as Rehearsal || null;
   } catch (error) {
     console.error('Error creating rehearsal:', error);
     return null;
@@ -80,7 +79,7 @@ const createRehearsal = async (rehearsalData: CreateRehearsalData): Promise<Rehe
 const updateRehearsal = async (id: string, rehearsalData: Partial<Rehearsal>): Promise<Rehearsal | null> => {
   try {
     const response = await dataService.put(`/rehearsals/${id}`, rehearsalData);
-    return response || null;
+    return response as Rehearsal || null;
   } catch (error) {
     console.error(`Error updating rehearsal with ID ${id}:`, error);
     return null;
