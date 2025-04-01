@@ -18,8 +18,8 @@ export const PerformanceThumbnail: React.FC<PerformanceThumbnailProps> = ({
   fallbackIcon = false,
   patternType
 }) => {
-  // Use consistent seed for pattern generation with both title and performanceId
-  // This ensures the pattern remains consistent but unique to each performance
+  // Make sure we have a string for patternSeed
+  // Always prioritize using performanceId when available
   const patternSeed = performanceId ? `${title}-${performanceId}` : title;
 
   // Select a pattern type to use
@@ -38,9 +38,9 @@ export const PerformanceThumbnail: React.FC<PerformanceThumbnailProps> = ({
     return patternType;
   }, [patternType, patternSeed]);
 
-  // Generate a slightly different hue based on performanceId or title if no id is provided
+  // Generate a slightly different hue based on performanceId or title
   const getColorVariation = () => {
-    // Use patternSeed which is safe since we made sure it's either title-performanceId or just title
+    // Make sure we use patternSeed which is guaranteed to be a string
     const idHash = patternSeed.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     // Use the hash to create small variations in the orange base color
     // This keeps it in the orange family but with subtle differences
@@ -48,10 +48,19 @@ export const PerformanceThumbnail: React.FC<PerformanceThumbnailProps> = ({
     return `hsl(${30 + hueShift}, 85%, 65%)`; // Base is around 30 (orange)
   };
   
-  const pattern = GeoPattern.generate(patternSeed, {
-    baseColor: getColorVariation(),
-    generator: selectedPatternType
-  });
+  // Try-catch block to handle any issues with pattern generation
+  let backgroundImage = '';
+  try {
+    const pattern = GeoPattern.generate(patternSeed, {
+      baseColor: getColorVariation(),
+      generator: selectedPatternType
+    });
+    backgroundImage = pattern.toDataUrl();
+  } catch (error) {
+    console.error('Error generating pattern:', error);
+    // Fallback to a simple gradient if pattern generation fails
+    backgroundImage = `linear-gradient(135deg, #f59e0b, #f97316)`;
+  }
   
   return (
     <div 
@@ -64,7 +73,7 @@ export const PerformanceThumbnail: React.FC<PerformanceThumbnailProps> = ({
       <div 
         className="absolute inset-0 w-full h-full"
         style={{ 
-          backgroundImage: pattern.toDataUrl(),
+          backgroundImage,
           backgroundSize: 'cover'
         }}
       />
