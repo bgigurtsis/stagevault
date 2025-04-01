@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -15,7 +16,8 @@ import {
   PlaySquare,
   AlertTriangle,
   Loader2,
-  Calendar
+  Calendar,
+  Video
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +26,8 @@ import {
   DropdownMenu,
   DropdownMenuContent, 
   DropdownMenuItem,
-  DropdownMenuTrigger 
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -294,36 +297,45 @@ export default function Performances() {
                       startDate={performance.startDate} 
                       endDate={performance.endDate}
                     />
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <PlaySquare className="h-4 w-4 mr-1.5 flex-shrink-0" />
-                      <span>{getRehearsalCount(performance.id)} {getRehearsalCount(performance.id) === 1 ? "rehearsal" : "rehearsals"}</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <PlaySquare className="h-4 w-4 mr-1.5 flex-shrink-0" />
+                        <span>{getRehearsalCount(performance.id)} {getRehearsalCount(performance.id) === 1 ? "rehearsal" : "rehearsals"}</span>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isDeleting}>
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => navigate(`/rehearsals/new?performanceId=${performance.id}`)}>
+                            <Users className="mr-2 h-4 w-4" />
+                            <span>Add Rehearsal</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => navigate(`/record?performanceId=${performance.id}`)}>
+                            <Video className="mr-2 h-4 w-4" />
+                            <span>Record Video</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => navigate(`/performances/${performance.id}/edit`)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            <span>Edit</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="text-destructive"
+                            onClick={() => setPerformanceToDelete(performance)}
+                            disabled={isDeleting}
+                          >
+                            <Trash className="mr-2 h-4 w-4" />
+                            <span>Delete</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                 </CardContent>
               </Link>
-              <CardFooter className="p-4 pt-0 flex items-center justify-end border-t mt-4">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isDeleting}>
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => navigate(`/performances/${performance.id}/edit`)}>
-                      <Edit className="mr-2 h-4 w-4" />
-                      <span>Edit</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      className="text-destructive"
-                      onClick={() => setPerformanceToDelete(performance)}
-                      disabled={isDeleting}
-                    >
-                      <Trash className="mr-2 h-4 w-4" />
-                      <span>Delete</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </CardFooter>
             </Card>
           ))}
         </div>

@@ -109,7 +109,7 @@ export default function RehearsalCard({
       
       <CardFooter>
         <Button 
-          variant={rehearsal ? "outline" : "default"}
+          variant={rehearsal ? "default" : "default"}
           className="w-full"
           onClick={() => window.location.href = `/rehearsals/new?performanceId=${performanceId}`}
         >

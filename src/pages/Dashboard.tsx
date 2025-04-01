@@ -1,14 +1,16 @@
+
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Theater, ArrowRight, Clock, Plus, Calendar, Search, Video, AlertTriangle } from "lucide-react";
+import { Theater, ArrowRight, Clock, Plus, Calendar, Search, Video, AlertTriangle, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
-import { Performance, Recording } from "@/types";
+import { Performance, Recording, Rehearsal } from "@/types";
 import { performanceService } from "@/services/performanceService";
 import { recordingService } from "@/services/recordingService";
+import { rehearsalService } from "@/services/rehearsalService";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PerformanceThumbnail } from "@/components/performance/PerformanceThumbnail";
@@ -42,6 +44,23 @@ export default function Dashboard() {
   });
 
   const {
+    data: rehearsals = [],
+    isLoading: isLoadingRehearsals,
+    error: rehearsalsError,
+    refetch: refetchRehearsals
+  } = useQuery({
+    queryKey: ["dashboard-rehearsals"],
+    queryFn: async () => {
+      try {
+        return await rehearsalService.getAllRehearsals();
+      } catch (error) {
+        console.error("Error fetching rehearsals:", error);
+        return [];
+      }
+    }
+  });
+
+  const {
     data: recordings = [],
     isLoading: isLoadingRecordings,
     error: recordingsError,
@@ -59,6 +78,7 @@ export default function Dashboard() {
   });
 
   const recentPerformances = performances.slice(0, 3);
+  const recentRehearsals = rehearsals.slice(0, 3);
   const recentRecordings = recordings.slice(0, 3);
 
   const formatDate = (dateString: string) => {
@@ -77,6 +97,7 @@ export default function Dashboard() {
 
   const handleRetry = () => {
     if (performancesError) refetchPerformances();
+    if (rehearsalsError) refetchRehearsals();
     if (recordingsError) refetchRecordings();
     
     toast({
@@ -85,8 +106,8 @@ export default function Dashboard() {
     });
   };
 
-  const isLoading = isLoadingPerformances || isLoadingRecordings;
-  const hasError = performancesError || recordingsError;
+  const isLoading = isLoadingPerformances || isLoadingRehearsals || isLoadingRecordings;
+  const hasError = performancesError || rehearsalsError || recordingsError;
 
   if (isLoading) {
     return <div className="container max-w-6xl py-6 space-y-8">
@@ -176,6 +197,12 @@ export default function Dashboard() {
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
+                <Link to="/rehearsals/new" className="flex items-center">
+                  <Users className="mr-2 h-4 w-4" />
+                  <span>New Rehearsal</span>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
                 <Link to="/record" className="flex items-center">
                   <Video className="mr-2 h-4 w-4" />
                   <span>Record Video</span>
@@ -244,6 +271,59 @@ export default function Dashboard() {
                     <span>
                       {performance.startDate ? formatDate(performance.startDate) : "No date set"}
                     </span>
+                  </div>
+                </CardContent>
+              </Card>)}
+          </div>}
+      </div>
+      
+      <div>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">Recent Rehearsals</h2>
+          <Link to="/rehearsals" className="text-sm text-primary flex items-center hover:underline">
+            <span>View all</span>
+            <ArrowRight className="ml-1 h-4 w-4" />
+          </Link>
+        </div>
+        
+        {recentRehearsals.length === 0 ? <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="rounded-full bg-muted p-3 mb-4">
+                <Users className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-semibold">No rehearsals yet</h3>
+              <p className="text-muted-foreground mt-1 mb-4 max-w-md">
+                Schedule your first rehearsal to get started
+              </p>
+              <Link to="/rehearsals/new">
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Rehearsal
+                </Button>
+              </Link>
+            </CardContent>
+          </Card> : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {recentRehearsals.map(rehearsal => <Card key={rehearsal.id} className="flex flex-col overflow-hidden">
+                <Link to={`/rehearsals/${rehearsal.id}`} className="group">
+                  <CardHeader className="p-4 pb-2">
+                    <CardTitle className="text-lg">{rehearsal.title}</CardTitle>
+                    {rehearsal.description && <CardDescription className="line-clamp-2">
+                        {rehearsal.description}
+                      </CardDescription>}
+                  </CardHeader>
+                </Link>
+                <CardContent className="p-4 pt-0 mt-auto">
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center text-sm text-muted-foreground">
+                      <Calendar className="h-4 w-4 mr-1 flex-shrink-0" />
+                      <span>{formatDate(rehearsal.date)}</span>
+                    </div>
+                    {rehearsal.performanceId && (
+                      <Link to={`/performances/${rehearsal.performanceId}`} className="text-sm text-primary hover:underline flex items-center">
+                        <Theater className="h-4 w-4 mr-1 flex-shrink-0" />
+                        <span>View Performance</span>
+                      </Link>
+                    )}
                   </div>
                 </CardContent>
               </Card>)}

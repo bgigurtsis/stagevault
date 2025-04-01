@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -17,6 +18,7 @@ import { rehearsalService } from "@/services/rehearsalService";
 import { Performance, Rehearsal } from "@/types";
 import RehearsalCard from "@/components/RehearsalCard";
 import { MapPin } from "lucide-react";
+
 export default function PerformanceDetail() {
   const {
     performanceId
@@ -244,10 +246,7 @@ export default function PerformanceDetail() {
                   </Button>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {performance.description && <div>
-                      <h3 className="font-medium mb-2">Description</h3>
-                      <p className="text-muted-foreground whitespace-pre-wrap">{performance.description}</p>
-                    </div>}
+                  {performance.description && <p className="text-muted-foreground whitespace-pre-wrap">{performance.description}</p>}
                   
                   <div>
                     <h3 className="font-medium mb-2">Date & Time</h3>
