@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -14,18 +13,15 @@ import { rehearsalService } from "@/services/rehearsalService";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PerformanceThumbnail } from "@/components/performance/PerformanceThumbnail";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 export default function Dashboard() {
-  const { currentUser } = useAuth();
-  const { toast } = useToast();
+  const {
+    currentUser
+  } = useAuth();
+  const {
+    toast
+  } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
-
   const {
     data: performances = [],
     isLoading: isLoadingPerformances,
@@ -42,7 +38,6 @@ export default function Dashboard() {
       }
     }
   });
-
   const {
     data: rehearsals = [],
     isLoading: isLoadingRehearsals,
@@ -59,7 +54,6 @@ export default function Dashboard() {
       }
     }
   });
-
   const {
     data: recordings = [],
     isLoading: isLoadingRecordings,
@@ -76,39 +70,32 @@ export default function Dashboard() {
       }
     }
   });
-
   const recentPerformances = performances.slice(0, 3);
   const recentRehearsals = rehearsals.slice(0, 3);
   const recentRecordings = recordings.slice(0, 3);
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric"
     });
   };
-
   const formatTime = (seconds: number | undefined) => {
     if (!seconds) return "00:00";
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
-
   const handleRetry = () => {
     if (performancesError) refetchPerformances();
     if (rehearsalsError) refetchRehearsals();
     if (recordingsError) refetchRecordings();
-    
     toast({
       title: "Retrying",
-      description: "Attempting to fetch your data again...",
+      description: "Attempting to fetch your data again..."
     });
   };
-
   const isLoading = isLoadingPerformances || isLoadingRehearsals || isLoadingRecordings;
   const hasError = performancesError || rehearsalsError || recordingsError;
-
   if (isLoading) {
     return <div className="container max-w-6xl py-6 space-y-8">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -145,7 +132,6 @@ export default function Dashboard() {
         </div>
       </div>;
   }
-
   if (hasError && !isLoading) {
     return <div className="container max-w-6xl py-8 space-y-8">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -169,7 +155,6 @@ export default function Dashboard() {
       </div>
     </div>;
   }
-
   return <div className="container max-w-6xl py-6 space-y-8">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -205,7 +190,7 @@ export default function Dashboard() {
               <DropdownMenuItem asChild>
                 <Link to="/record" className="flex items-center">
                   <Video className="mr-2 h-4 w-4" />
-                  <span>Record Video</span>
+                  <span>New Video</span>
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -217,13 +202,7 @@ export default function Dashboard() {
         <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
           <Search className="h-5 w-5 text-muted-foreground" />
         </div>
-        <Input
-          type="search"
-          placeholder="Search anything..."
-          className="pl-10"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
+        <Input type="search" placeholder="Search anything..." className="pl-10" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
       </div>
       
       <div>
@@ -254,10 +233,7 @@ export default function Dashboard() {
           </Card> : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {recentPerformances.map(performance => <Card key={performance.id} className="flex flex-col overflow-hidden">
                 <Link to={`/performances/${performance.id}`} className="group">
-                  <PerformanceThumbnail 
-                    title={performance.title} 
-                    className="w-full"
-                  />
+                  <PerformanceThumbnail title={performance.title} className="w-full" />
                   <CardHeader className="p-4 pb-2">
                     <CardTitle className="text-lg">{performance.title}</CardTitle>
                     {performance.description && <CardDescription className="line-clamp-2">
@@ -318,12 +294,10 @@ export default function Dashboard() {
                       <Calendar className="h-4 w-4 mr-1 flex-shrink-0" />
                       <span>{formatDate(rehearsal.date)}</span>
                     </div>
-                    {rehearsal.performanceId && (
-                      <Link to={`/performances/${rehearsal.performanceId}`} className="text-sm text-primary hover:underline flex items-center">
+                    {rehearsal.performanceId && <Link to={`/performances/${rehearsal.performanceId}`} className="text-sm text-primary hover:underline flex items-center">
                         <Theater className="h-4 w-4 mr-1 flex-shrink-0" />
                         <span>View Performance</span>
-                      </Link>
-                    )}
+                      </Link>}
                   </div>
                 </CardContent>
               </Card>)}
