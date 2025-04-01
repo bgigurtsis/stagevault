@@ -64,10 +64,10 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				},
 				stage: {
-					purple: '#8B5CF6',
-					'deep-purple': '#6E59A5',
-					light: '#F6F6F7',
-					accent: '#D946EF'
+					orange: '#E67E22', // Changed from purple to orange
+					'deep-orange': '#D35400', // Changed from deep-purple to deep-orange
+					light: '#F5F7FA', // Kept the same
+					accent: '#F39C12' // Changed from D946EF to secondary orange
 				}
 			},
 			borderRadius: {

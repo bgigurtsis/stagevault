@@ -12,7 +12,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 
-// Create a schema for form validation
 const loginFormSchema = z.object({
   email: z.string().email({
     message: "Please enter a valid email address"
@@ -22,6 +21,7 @@ const loginFormSchema = z.object({
   })
 });
 type LoginFormValues = z.infer<typeof loginFormSchema>;
+
 export default function Login() {
   const [loading, setLoading] = useState(false);
   const {
@@ -34,7 +34,6 @@ export default function Login() {
     toast
   } = useToast();
 
-  // Create form
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: {
@@ -45,9 +44,7 @@ export default function Login() {
   console.log("=== Login Component Rendered ===");
   console.log("isAuthenticated:", isAuthenticated);
 
-  // Handle authentication hash params in URL
   useEffect(() => {
-    // Function to parse URL hash params into an object
     const parseHashParams = (hash: string) => {
       const params = new URLSearchParams(hash.substring(1));
       const result: Record<string, string> = {};
@@ -57,14 +54,12 @@ export default function Login() {
       return result;
     };
 
-    // Check for hash parameters (access_token, etc.) which indicates a successful OAuth redirect
     const hash = window.location.hash;
     console.log("=== Checking URL hash for auth tokens ===");
     console.log("Hash exists:", !!hash);
     if (hash) {
       console.log("Full hash string:", hash);
 
-      // Parse all hash parameters
       const hashParams = parseHashParams(hash);
       console.log("Parsed hash parameters:", hashParams);
       if (hashParams.access_token) {
@@ -74,7 +69,6 @@ export default function Login() {
         console.log("Expires in:", hashParams.expires_in);
         console.log("Refresh token exists:", !!hashParams.refresh_token);
 
-        // Check if we got a provider token (this is needed for Google Drive API)
         if (hashParams.provider_token) {
           console.log("Provider token exists (first 20 chars):", hashParams.provider_token.substring(0, 20) + "...");
         } else {
@@ -84,7 +78,6 @@ export default function Login() {
         if (hashParams.access_token && hashParams.refresh_token) {
           console.log("Attempting to set session from hash parameters");
 
-          // Try to set the session manually
           supabase.auth.setSession({
             access_token: hashParams.access_token,
             refresh_token: hashParams.refresh_token
@@ -125,18 +118,15 @@ export default function Login() {
           });
         }
 
-        // Clear the hash from the URL to avoid issues on refresh
         window.history.replaceState(null, document.title, window.location.pathname);
         console.log("URL hash cleared");
       }
     }
 
-    // Log the current path
     console.log("Current path:", window.location.pathname);
     console.log("Current full URL:", window.location.href);
   }, [navigate, toast]);
 
-  // Check for existing session and redirect if authenticated
   useEffect(() => {
     console.log("=== Login - auth status check useEffect ===");
     console.log("isAuthenticated:", isAuthenticated);
@@ -149,6 +139,7 @@ export default function Login() {
       });
     }
   }, [isAuthenticated, navigate, toast]);
+
   const handleGoogleLogin = async () => {
     console.log("=== Google login button clicked ===");
     setLoading(true);
@@ -156,7 +147,6 @@ export default function Login() {
       console.log("Calling loginWithGoogle function");
       await loginWithGoogle();
       console.log("loginWithGoogle function completed - redirect should happen via OAuth");
-      // No need to navigate here as the OAuth redirect will handle this
     } catch (error) {
       console.error("=== Login failed ===");
       console.error("Error object:", error);
@@ -171,7 +161,6 @@ export default function Login() {
     }
   };
 
-  // Handle form submission for email/password login
   const onSubmit = async (values: LoginFormValues) => {
     console.log("=== Email/password login form submitted ===");
     setLoading(true);
@@ -208,9 +197,10 @@ export default function Login() {
       setLoading(false);
     }
   };
+
   return <div className="min-h-screen flex flex-col items-center justify-center bg-muted/40 p-4">
       <div className="mb-8 flex flex-col items-center">
-        <div className="rounded-xl bg-stage-purple p-2 mb-4">
+        <div className="rounded-xl bg-stage-orange p-2 mb-4">
           <Video className="h-8 w-8 text-white" />
         </div>
         <h1 className="text-3xl font-bold tracking-tight">StageVault</h1>
@@ -225,7 +215,6 @@ export default function Login() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Google Sign In Button */}
           <Button variant="outline" className="w-full flex gap-2 items-center justify-center py-6" onClick={handleGoogleLogin} disabled={loading}>
             {loading ? <span className="flex items-center gap-2">
                 <svg className="animate-spin h-5 w-5 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -256,7 +245,6 @@ export default function Login() {
             </div>
           </div>
 
-          {/* Email/Password Form */}
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField control={form.control} name="email" render={({
@@ -301,7 +289,6 @@ export default function Login() {
         </CardFooter>
       </Card>
 
-      {/* Debug information section - only visible in development */}
       {process.env.NODE_ENV === 'development'}
     </div>;
 }

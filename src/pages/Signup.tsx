@@ -120,7 +120,7 @@ export default function Signup() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-muted/40 p-4">
       <div className="mb-8 flex flex-col items-center">
-        <div className="rounded-xl bg-stage-purple p-2 mb-4">
+        <div className="rounded-xl bg-stage-orange p-2 mb-4">
           <Video className="h-8 w-8 text-white" />
         </div>
         <h1 className="text-3xl font-bold tracking-tight">StageVault</h1>

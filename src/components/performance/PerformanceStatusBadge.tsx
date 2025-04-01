@@ -29,29 +29,29 @@ export function PerformanceStatusBadge({ startDate, endDate }: PerformanceStatus
         return {
           label: "Active",
           variant: "default" as const, 
-          color: "#F2FCE2",
-          textColor: "#2E7D32"
+          color: "#E8F5E9", // Light green background
+          textColor: "#2E7D32" // Dark green text
         };
       case "upcoming":
         return {
           label: "Upcoming",
           variant: "outline" as const,
-          color: "#FEC6A1",
-          textColor: "#E65100"
+          color: "#FEF4E6", // Light orange background
+          textColor: "#E67E22" // Orange text (our primary)
         };
       case "past":
         return {
           label: "Past",
           variant: "outline" as const,
-          color: "#ea384c",
-          textColor: "#B71C1C"
+          color: "#FDEDEC", // Light red background
+          textColor: "#C0392B" // Dark red text
         };
       default:
         return {
           label: "Unscheduled",
           variant: "outline" as const,
-          color: "#9b87f5",
-          textColor: "#4527A0"
+          color: "#F4F6F7", // Light gray background
+          textColor: "#7F8C8D" // Medium gray text
         };
     }
   };

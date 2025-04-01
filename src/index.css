@@ -5,44 +5,47 @@
 
 @layer base {
   :root {
+    /* Main background is already white */
     --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    --foreground: 210 29% 24%; /* Dark navy text #2C3E50 */
 
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 210 29% 24%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
+    --popover-foreground: 210 29% 24%;
 
-    --primary: 265 84% 63%;
-    --primary-foreground: 0 0% 98%;
+    /* Primary orange for accents */
+    --primary: 28 85% 52%; /* #E67E22 */
+    --primary-foreground: 0 0% 100%; /* White text on orange */
 
     --secondary: 240 5.9% 10%;
     --secondary-foreground: 0 0% 98%;
 
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
+    --muted: 220 13% 95%; /* Light gray background #F5F7FA */
+    --muted-foreground: 210 29% 50%; /* Lighter navy for secondary text */
 
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
+    --accent: 220 13% 95%;
+    --accent-foreground: 210 29% 24%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 265 84% 63%;
+    --border: 220 13% 91%; /* Light border #E5E7EB */
+    --input: 220 13% 91%;
+    --ring: 28 85% 52%; /* Ring using orange */
 
     --radius: 0.5rem;
 
+    /* Update sidebar variables too */
     --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 265 84% 63%;
+    --sidebar-foreground: 210 29% 24%;
+    --sidebar-primary: 28 85% 52%; /* Orange for sidebar highlights */
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-accent: 220 14% 96%;
+    --sidebar-accent-foreground: 210 29% 24%;
     --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 28 85% 52%;
   }
 
   .dark {
@@ -55,7 +58,7 @@
     --popover: 240 10% 3.9%;
     --popover-foreground: 0 0% 98%;
 
-    --primary: 265 84% 63%;
+    --primary: 28 85% 52%; /* Orange in dark mode too */
     --primary-foreground: 0 0% 98%;
 
     --secondary: 240 3.7% 15.9%;
@@ -72,7 +75,7 @@
 
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
-    --ring: 265 84% 63%;
+    --ring: 28 85% 52%; /* Orange ring in dark mode */
   }
 }
 

@@ -69,7 +69,7 @@ export default function Layout() {
       <aside className="hidden md:flex md:w-64 flex-col bg-sidebar border-r">
         <div className="flex h-16 items-center px-4 border-b">
           <Link to="/" className="flex items-center gap-2">
-            <div className="rounded-md bg-stage-purple p-1">
+            <div className="rounded-md bg-stage-orange p-1">
               <Theater className="h-6 w-6 text-white" />
             </div>
             <h1 className="text-xl font-bold">StageVault</h1>
@@ -112,7 +112,7 @@ export default function Layout() {
             <Menu className="h-6 w-6" />
           </Button>
           <Link to="/" className="flex items-center gap-2">
-            <div className="rounded-md bg-stage-purple p-1">
+            <div className="rounded-md bg-stage-orange p-1">
               <Theater className="h-5 w-5 text-white" />
             </div>
             <h1 className="text-lg font-bold">StageVault</h1>
@@ -130,7 +130,7 @@ export default function Layout() {
             <div className="fixed inset-y-0 left-0 w-3/4 max-w-sm bg-background shadow-lg">
               <div className="flex h-16 items-center justify-between border-b px-4">
                 <Link to="/" className="flex items-center gap-2">
-                  <div className="rounded-md bg-stage-purple p-1">
+                  <div className="rounded-md bg-stage-orange p-1">
                     <Theater className="h-5 w-5 text-white" />
                   </div>
                   <h1 className="text-lg font-bold">StageVault</h1>
