@@ -12,20 +12,25 @@ interface PerformanceThumbnailProps {
 }
 
 export const PerformanceThumbnail: React.FC<PerformanceThumbnailProps> = ({ 
-  title, 
+  title = "", // Provide default empty string for title
   className = "",
   performanceId,
   fallbackIcon = false,
   patternType
 }) => {
-  // Make sure we have a valid string for patternSeed
-  // Always prioritize using performanceId when available
-  const patternSeed = performanceId ? `${title}-${performanceId}` : title || "default-pattern";
+  // Ensure both title and performanceId are strings or empty strings (never undefined)
+  const safeTitle = title || "";
+  const safePerformanceId = performanceId || "";
+  
+  // Create a valid pattern seed that will always be a string
+  const patternSeed = safePerformanceId 
+    ? `${safeTitle}-${safePerformanceId}` 
+    : safeTitle || "default-pattern";
 
   // Select a pattern type to use
   const selectedPatternType = useMemo(() => {
     if (!patternType) {
-      return "chevrons"; // Use a specific default instead of undefined
+      return "chevrons"; // Use a specific default
     }
     
     if (Array.isArray(patternType)) {
@@ -40,11 +45,7 @@ export const PerformanceThumbnail: React.FC<PerformanceThumbnailProps> = ({
 
   // Generate a fixed color with variations based on the seed
   const getColorVariation = () => {
-    // Use a default string if patternSeed is somehow empty
-    const seed = patternSeed || "default-seed";
-    const idHash = seed.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    
-    // Use predefined color values instead of dynamic HSL to avoid color parsing issues
+    // Define fixed colors to avoid any HSL parsing issues
     const baseOrangeColors = [
       "#f97316", // orange-500
       "#f59e0b", // amber-500
@@ -54,15 +55,24 @@ export const PerformanceThumbnail: React.FC<PerformanceThumbnailProps> = ({
       "#fbbf24"  // amber-400
     ];
     
+    // Get a hash based on the pattern seed
+    const idHash = patternSeed.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    
     // Use the hash to select a predefined color
-    return baseOrangeColors[idHash % baseOrangeColors.length];
+    return baseOrangeColors[Math.abs(idHash) % baseOrangeColors.length];
   };
   
-  // Generate background with strong error handling
+  // Generate background with robust error handling
   const backgroundImage = useMemo(() => {
     try {
-      // Use explicit color and pattern type to avoid issues
+      // Use explicit color and pattern type
       const color = getColorVariation();
+      
+      // Make sure we pass valid parameters
+      if (!patternSeed || !color || !selectedPatternType) {
+        throw new Error("Invalid pattern parameters");
+      }
+      
       const pattern = GeoPattern.generate(patternSeed, {
         baseColor: color,
         generator: selectedPatternType
@@ -70,7 +80,7 @@ export const PerformanceThumbnail: React.FC<PerformanceThumbnailProps> = ({
       return pattern.toDataUrl();
     } catch (error) {
       console.error('Error generating pattern:', error);
-      // Fallback to a simple gradient that doesn't rely on the library
+      // Fallback to a simple gradient
       return `linear-gradient(135deg, #f59e0b, #f97316)`;
     }
   }, [patternSeed, selectedPatternType]);
@@ -81,7 +91,7 @@ export const PerformanceThumbnail: React.FC<PerformanceThumbnailProps> = ({
         "aspect-video bg-muted flex items-center justify-center relative overflow-hidden",
         className
       )}
-      aria-label={`Thumbnail for ${title}`}
+      aria-label={`Thumbnail for ${safeTitle}`}
     >
       <div 
         className="absolute inset-0 w-full h-full"
