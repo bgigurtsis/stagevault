@@ -1,6 +1,6 @@
 
 import React from "react";
-import { AlertCircle, RefreshCw, ScreenShare, Settings, Camera } from "lucide-react";
+import { AlertCircle, RefreshCw, ScreenShare, Settings, Camera, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
@@ -20,6 +20,8 @@ const CameraError: React.FC<CameraErrorProps> = ({
   const isPermissionDenied = errorMessage.includes('denied') || errorMessage.includes('NotAllowedError');
   const isPermanentlyDenied = isPermissionDenied && errorMessage.includes('Permission denied');
   const isTimeout = errorMessage.includes('Timeout') || errorMessage.includes('timeout');
+  const isDeviceInUse = errorMessage.includes('in use') || errorMessage.includes('NotReadableError');
+  const isNoCamera = errorMessage.includes('No camera') || errorMessage.includes('NotFoundError');
   
   // Wrap handlers in explicit function to improve event handling
   const handleRetry = (e: React.MouseEvent) => {
@@ -99,6 +101,24 @@ const CameraError: React.FC<CameraErrorProps> = ({
               <li>Close other applications that might be using your camera</li>
               <li>Try using a different camera if available</li>
               <li>If on mobile, try restarting your device</li>
+            </ol>
+          </div>
+        ) : isDeviceInUse ? (
+          <div className="mt-4 bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">
+            <p className="font-medium mb-2">Your camera is currently in use</p>
+            <ol className="list-decimal pl-4 space-y-1">
+              <li>Close other applications or browser tabs that may be using your camera</li>
+              <li>Try restarting your browser</li>
+              <li>On mobile, check if any other apps might be using the camera</li>
+            </ol>
+          </div>
+        ) : isNoCamera ? (
+          <div className="mt-4 bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">
+            <p className="font-medium mb-2">No camera detected</p>
+            <ol className="list-decimal pl-4 space-y-1">
+              <li>Make sure your camera is properly connected</li>
+              <li>If using an external camera, try reconnecting it</li>
+              <li>Try using screen sharing instead</li>
             </ol>
           </div>
         ) : null}
