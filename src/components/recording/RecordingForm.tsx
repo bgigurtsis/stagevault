@@ -1,11 +1,12 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
   Save, 
   Plus,
   ChevronDown,
   ChevronUp,
   X, 
+  GripHorizontal
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,15 @@ import { useToast } from "@/hooks/use-toast";
 import { performanceService } from "@/services/performanceService";
 import { rehearsalService } from "@/services/rehearsalService";
 import { Performance, Rehearsal } from "@/types";
+import { useAuth } from "@/hooks/useAuthContext";
+import MobileSwipeGesture from "@/components/MobileSwipeGesture";
+
+// Define form states
+enum FormVisibilityState {
+  HIDDEN = 'hidden',
+  PARTIAL = 'partial',
+  FULL = 'full'
+}
 
 interface RecordingFormProps {
   isVisible: boolean;
@@ -72,8 +82,40 @@ export function RecordingForm({
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [formState, setFormState] = useState<FormVisibilityState>(
+    isVisible ? FormVisibilityState.FULL : FormVisibilityState.HIDDEN
+  );
   
+  const formRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
+  
+  // Handle swipe gestures
+  const handleSwipeUp = () => {
+    if (formState === FormVisibilityState.HIDDEN) {
+      setFormState(FormVisibilityState.PARTIAL);
+    } else if (formState === FormVisibilityState.PARTIAL) {
+      setFormState(FormVisibilityState.FULL);
+    }
+  };
+  
+  const handleSwipeDown = () => {
+    if (formState === FormVisibilityState.FULL) {
+      setFormState(FormVisibilityState.PARTIAL);
+    } else if (formState === FormVisibilityState.PARTIAL) {
+      setFormState(FormVisibilityState.HIDDEN);
+    }
+  };
+  
+  const toggleFormState = () => {
+    if (formState === FormVisibilityState.HIDDEN) {
+      setFormState(FormVisibilityState.PARTIAL);
+    } else if (formState === FormVisibilityState.PARTIAL) {
+      setFormState(FormVisibilityState.FULL);
+    } else {
+      setFormState(FormVisibilityState.PARTIAL);
+    }
+  };
   
   // Generate smart default title
   useEffect(() => {
@@ -91,6 +133,15 @@ export function RecordingForm({
       setTitle(`Recording - ${formattedDate} ${formattedTime}`);
     }
   }, [title]);
+  
+  // Update form state based on isVisible prop
+  useEffect(() => {
+    if (isVisible) {
+      setFormState(FormVisibilityState.FULL);
+    } else if (formState !== FormVisibilityState.HIDDEN) {
+      setFormState(FormVisibilityState.HIDDEN);
+    }
+  }, [isVisible]);
   
   // Load performances and rehearsals with error handling
   useEffect(() => {
@@ -179,6 +230,15 @@ export function RecordingForm({
       return;
     }
     
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "You need to be logged in to create a performance.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
       console.log("Creating new performance:", newPerformanceTitle);
       setIsSubmitting(true);
@@ -186,10 +246,14 @@ export function RecordingForm({
       const newPerformance = await performanceService.createPerformance({
         title: newPerformanceTitle,
         startDate: new Date().toISOString().split('T')[0],
-        createdBy: "current-user"
+        createdBy: user.id // Use the actual user ID instead of "current-user"
       });
       
       console.log("New performance created:", newPerformance);
+      
+      if (!newPerformance) {
+        throw new Error("Failed to create performance");
+      }
       
       // Update the local state with the new performance
       setPerformances(prev => [newPerformance, ...prev]);
@@ -315,239 +379,260 @@ export function RecordingForm({
     }
   }, [uploadComplete]);
   
+  const getFormStateClass = () => {
+    switch (formState) {
+      case FormVisibilityState.HIDDEN:
+        return "form-state-hidden";
+      case FormVisibilityState.PARTIAL:
+        return "form-state-partial";
+      case FormVisibilityState.FULL:
+        return "form-state-full";
+      default:
+        return "";
+    }
+  };
+  
   return (
-    <div className={`recording-metadata ${className}`}>
-      <div className="form-header flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold">Recording Details</h2>
-        {onToggleVisibility && (
-          <button onClick={onToggleVisibility} className="text-gray-500 hover:text-gray-700">
-            <X className="h-5 w-5" />
-          </button>
-        )}
-      </div>
-      
-      {formError && (
-        <div className="bg-red-50 border border-red-200 text-red-800 rounded-md p-3 mb-4">
-          <p className="text-sm">{formError}</p>
-        </div>
-      )}
-      
-      <div className="space-y-4" onChange={(e) => setFormError(null)}>
-        <div>
-          <Label htmlFor="title">Title</Label>
-          <Input 
-            id="title" 
-            name="title" 
-            value={title} 
-            onChange={(e) => setTitle(e.target.value)} 
-            placeholder="Enter recording title"
-            disabled={isUploading || isSubmitting}
-          />
+    <MobileSwipeGesture 
+      onSwipeUp={handleSwipeUp}
+      onSwipeDown={handleSwipeDown}
+      className={`recording-metadata ${className}`}
+    >
+      <div 
+        ref={formRef}
+        className={`recording-form-container ${getFormStateClass()}`}
+      >
+        <div className="recording-form-handle-container" onClick={toggleFormState}>
+          <div className="recording-form-handle"></div>
+          <GripHorizontal className="h-4 w-4 text-gray-400 mx-auto mt-1" />
         </div>
         
-        <div>
-          <Label htmlFor="performance">Performance</Label>
-          {isCreatingPerformance ? (
-            <div className="flex flex-col gap-2">
-              <Input 
-                id="new-performance" 
-                value={newPerformanceTitle} 
-                onChange={(e) => setNewPerformanceTitle(e.target.value)} 
-                placeholder="New performance title"
-                disabled={isUploading || isSubmitting}
-              />
-              <div className="flex gap-2">
-                <Button 
-                  type="button" 
-                  size="sm" 
-                  variant="default"
-                  onClick={handleCreatePerformance}
-                  disabled={isUploading || isSubmitting}
-                >
-                  Create
-                </Button>
-                <Button 
-                  type="button" 
-                  size="sm" 
-                  variant="outline"
-                  onClick={() => setIsCreatingPerformance(false)}
-                  disabled={isUploading || isSubmitting}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex gap-2">
-              <Select 
-                name="performance"
-                value={selectedPerformance} 
-                onValueChange={setSelectedPerformance}
-                disabled={isUploading || isSubmitting}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a performance" />
-                </SelectTrigger>
-                <SelectContent>
-                  {performances.map(performance => (
-                    <SelectItem key={performance.id} value={performance.id}>
-                      {performance.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              <Button 
-                type="button" 
-                size="icon" 
-                variant="outline"
-                onClick={() => setIsCreatingPerformance(true)}
-                disabled={isUploading || isSubmitting}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-        </div>
-        
-        <div>
-          <Label htmlFor="rehearsal">Rehearsal</Label>
-          {isCreatingRehearsal ? (
-            <div className="flex flex-col gap-2">
-              <Input 
-                id="new-rehearsal" 
-                value={newRehearsalTitle} 
-                onChange={(e) => setNewRehearsalTitle(e.target.value)} 
-                placeholder="New rehearsal title"
-                disabled={isUploading || isSubmitting}
-              />
-              <div className="flex gap-2">
-                <Button 
-                  type="button" 
-                  size="sm" 
-                  variant="default"
-                  onClick={handleCreateRehearsal}
-                  disabled={isUploading || isSubmitting || !selectedPerformance}
-                >
-                  Create
-                </Button>
-                <Button 
-                  type="button" 
-                  size="sm" 
-                  variant="outline"
-                  onClick={() => setIsCreatingRehearsal(false)}
-                  disabled={isUploading || isSubmitting}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex gap-2">
-              <Select 
-                name="rehearsal"
-                value={selectedRehearsal} 
-                onValueChange={setSelectedRehearsal}
-                disabled={isUploading || isSubmitting || !selectedPerformance}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a rehearsal" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableRehearsals.map(rehearsal => (
-                    <SelectItem key={rehearsal.id} value={rehearsal.id}>
-                      {rehearsal.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              <Button 
-                type="button" 
-                size="icon" 
-                variant="outline"
-                onClick={() => setIsCreatingRehearsal(true)}
-                disabled={isUploading || isSubmitting || !selectedPerformance}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-        </div>
-        
-        <div>
-          <button
-            type="button"
-            className="flex items-center text-sm font-medium text-primary mb-2"
-            onClick={() => setAdvancedOpen(!advancedOpen)}
-          >
-            {advancedOpen ? (
-              <ChevronUp className="h-4 w-4 mr-1" />
-            ) : (
-              <ChevronDown className="h-4 w-4 mr-1" />
+        <div className="form-content">
+          <div className="form-header flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold">Recording Details</h2>
+            {onToggleVisibility && (
+              <button onClick={onToggleVisibility} className="text-gray-500 hover:text-gray-700">
+                <X className="h-5 w-5" />
+              </button>
             )}
-            {advancedOpen ? "Hide advanced options" : "Show advanced options"}
-          </button>
+          </div>
           
-          {advancedOpen && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea 
-                  id="notes" 
-                  name="notes"
-                  value={notes} 
-                  onChange={(e) => setNotes(e.target.value)} 
-                  placeholder="Add notes about this recording"
-                  rows={3}
-                  disabled={isUploading || isSubmitting}
-                />
-              </div>
-              <div>
-                <Label htmlFor="tags">Tags (comma-separated)</Label>
-                <Input 
-                  id="tags" 
-                  name="tags"
-                  value={tags} 
-                  onChange={(e) => setTags(e.target.value)} 
-                  placeholder="e.g. solo, act1, blocking"
-                  disabled={isUploading || isSubmitting}
-                />
-              </div>
+          {formError && (
+            <div className="bg-red-50 border border-red-200 text-red-800 rounded-md p-3 mb-4">
+              <p className="text-sm">{formError}</p>
             </div>
           )}
+          
+          <div className="space-y-4" onChange={(e) => setFormError(null)}>
+            <div>
+              <Label htmlFor="title">Title</Label>
+              <Input 
+                id="title" 
+                name="title" 
+                value={title} 
+                onChange={(e) => setTitle(e.target.value)} 
+                placeholder="Enter recording title"
+                disabled={isUploading || isSubmitting}
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="performance">Performance</Label>
+              {isCreatingPerformance ? (
+                <div className="flex flex-col gap-2">
+                  <Input 
+                    id="new-performance" 
+                    value={newPerformanceTitle} 
+                    onChange={(e) => setNewPerformanceTitle(e.target.value)} 
+                    placeholder="New performance title"
+                    disabled={isUploading || isSubmitting}
+                  />
+                  <div className="flex gap-2">
+                    <Button 
+                      type="button" 
+                      size="sm" 
+                      variant="default"
+                      onClick={handleCreatePerformance}
+                      disabled={isUploading || isSubmitting}
+                    >
+                      Create
+                    </Button>
+                    <Button 
+                      type="button" 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => setIsCreatingPerformance(false)}
+                      disabled={isUploading || isSubmitting}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Select 
+                    name="performance"
+                    value={selectedPerformance} 
+                    onValueChange={setSelectedPerformance}
+                    disabled={isUploading || isSubmitting}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a performance" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="new-performance" className="font-medium text-primary">
+                        + New Performance
+                      </SelectItem>
+                      <SelectItem value="" disabled className="font-semibold text-muted-foreground">
+                        Your Performances
+                      </SelectItem>
+                      {performances.map(performance => (
+                        <SelectItem key={performance.id} value={performance.id}>
+                          {performance.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+            
+            <div>
+              <Label htmlFor="rehearsal">Rehearsal</Label>
+              {isCreatingRehearsal ? (
+                <div className="flex flex-col gap-2">
+                  <Input 
+                    id="new-rehearsal" 
+                    value={newRehearsalTitle} 
+                    onChange={(e) => setNewRehearsalTitle(e.target.value)} 
+                    placeholder="New rehearsal title"
+                    disabled={isUploading || isSubmitting}
+                  />
+                  <div className="flex gap-2">
+                    <Button 
+                      type="button" 
+                      size="sm" 
+                      variant="default"
+                      onClick={handleCreateRehearsal}
+                      disabled={isUploading || isSubmitting || !selectedPerformance}
+                    >
+                      Create
+                    </Button>
+                    <Button 
+                      type="button" 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => setIsCreatingRehearsal(false)}
+                      disabled={isUploading || isSubmitting}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Select 
+                    name="rehearsal"
+                    value={selectedRehearsal} 
+                    onValueChange={setSelectedRehearsal}
+                    disabled={isUploading || isSubmitting || !selectedPerformance}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a rehearsal" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="new-rehearsal" className="font-medium text-primary">
+                        + New Rehearsal
+                      </SelectItem>
+                      <SelectItem value="" disabled className="font-semibold text-muted-foreground">
+                        Rehearsals
+                      </SelectItem>
+                      {availableRehearsals.map(rehearsal => (
+                        <SelectItem key={rehearsal.id} value={rehearsal.id}>
+                          {rehearsal.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+            
+            <div>
+              <button
+                type="button"
+                className="flex items-center text-sm font-medium text-primary mb-2"
+                onClick={() => setAdvancedOpen(!advancedOpen)}
+              >
+                {advancedOpen ? (
+                  <ChevronUp className="h-4 w-4 mr-1" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 mr-1" />
+                )}
+                {advancedOpen ? "Hide advanced options" : "Show advanced options"}
+              </button>
+              
+              {advancedOpen && (
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="notes">Notes</Label>
+                    <Textarea 
+                      id="notes" 
+                      name="notes"
+                      value={notes} 
+                      onChange={(e) => setNotes(e.target.value)} 
+                      placeholder="Add notes about this recording"
+                      rows={3}
+                      disabled={isUploading || isSubmitting}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="tags">Tags (comma-separated)</Label>
+                    <Input 
+                      id="tags" 
+                      name="tags"
+                      value={tags} 
+                      onChange={(e) => setTags(e.target.value)} 
+                      placeholder="e.g. solo, act1, blocking"
+                      disabled={isUploading || isSubmitting}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div className="mt-6 space-y-2">
+            <Button 
+              type="submit" 
+              className="w-full"
+              disabled={isUploading || isSubmitting}
+              onClick={handleSubmit}
+            >
+              <Save className="mr-2 h-4 w-4" />
+              Save Recording
+            </Button>
+            
+            {onCancel && (
+              <Button 
+                type="button" 
+                variant="outline"
+                className="w-full"
+                onClick={onCancel}
+                disabled={isUploading || isSubmitting}
+              >
+                Cancel
+              </Button>
+            )}
+            
+            {(isUploading || isSubmitting) && (
+              <p className="text-xs text-center mt-2 text-muted-foreground">
+                Please don't navigate away while saving...
+              </p>
+            )}
+          </div>
         </div>
       </div>
-      
-      <div className="mt-6 space-y-2">
-        <Button 
-          type="submit" 
-          className="w-full"
-          disabled={isUploading || isSubmitting}
-          onClick={handleSubmit}
-        >
-          <Save className="mr-2 h-4 w-4" />
-          Save Recording
-        </Button>
-        
-        {onCancel && (
-          <Button 
-            type="button" 
-            variant="outline"
-            className="w-full"
-            onClick={onCancel}
-            disabled={isUploading || isSubmitting}
-          >
-            Cancel
-          </Button>
-        )}
-        
-        {(isUploading || isSubmitting) && (
-          <p className="text-xs text-center mt-2 text-muted-foreground">
-            Please don't navigate away while saving...
-          </p>
-        )}
-      </div>
-    </div>
+    </MobileSwipeGesture>
   );
 }

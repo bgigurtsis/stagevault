@@ -51,7 +51,7 @@ export function PerformanceForm({
 }: PerformanceFormProps) {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { users } = useAuth();
+  const { users, user } = useAuth();
 
   // Generate smart default title and dates
   const generateDefaultValues = () => {
@@ -75,9 +75,23 @@ export function PerformanceForm({
     defaultValues: generateDefaultValues(),
   });
 
+  // Handle form submission
+  const handleFormSubmit = async (values: FormValues) => {
+    try {
+      await onSubmit(values);
+    } catch (error) {
+      console.error("Error submitting form:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save performance. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
         <FormField
           control={form.control}
           name="title"

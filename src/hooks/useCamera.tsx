@@ -10,7 +10,8 @@ import {
   getMobileStreamWithTimeout,
   tryMediaWithFallback,
   getScreenShareWithAudio,
-  emergencyMediaFallback
+  emergencyMediaFallback,
+  getVideoOnlyStream
 } from "@/utils/cameraUtils";
 
 interface UseCameraOptions {
@@ -113,49 +114,12 @@ export const useCamera = (options?: UseCameraOptions) => {
     logDebug(`Camera access attempt #${attemptNumber}`, { deviceId });
     
     try {
-      const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-      
-      let stream: MediaStream;
-      
-      if (deviceId) {
-        const constraints = {
-          video: {
-            deviceId: { exact: deviceId },
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          },
-          audio: true
-        };
-        
-        logDebug(`Using specific device ID ${deviceId.substring(0, 10)}...`);
-        stream = await getUserMediaWithTimeout(constraints, options?.timeoutDuration || 10000);
-      } else if (isMobileDevice) {
-        logDebug("Using mobile-optimized constraints");
-        stream = await getMobileStreamWithTimeout();
-      } else {
-        logDebug("Using enhanced fallback strategies");
-        const result = await tryMediaWithFallback();
-        stream = result.stream;
-        
-        if (result.isFallback) {
-          setUsingFallbackMode(true);
-          toast({
-            title: "Using fallback mode",
-            description: "Camera access was challenging. Using an alternative video source.",
-            duration: 5000,
-          });
-        }
-      }
-      
-      logDebug("Camera access successful", {
-        tracks: stream.getTracks().map(t => `${t.kind}:${t.label}`)
-      });
-      
-      return stream;
+      logDebug("Using video-only strategy as primary method");
+      return await getVideoOnlyStream();
     } catch (error) {
-      logDebug(`Camera access attempt #${attemptNumber} failed`, error);
+      logDebug(`Video-only strategy failed`, error);
       
-      if (attemptNumber < 3) {
+      if (attemptNumber < 2) {
         logDebug(`Trying again with attempt #${attemptNumber + 1}`);
         setRetryCount(attemptNumber);
         
@@ -164,18 +128,16 @@ export const useCamera = (options?: UseCameraOptions) => {
         return tryAccessCamera(attemptNumber + 1, deviceId);
       }
       
-      if (attemptNumber === 3) {
-        logDebug("Trying emergency fallback as last resort");
-        const emergencyStream = await emergencyMediaFallback();
-        if (emergencyStream) {
-          setUsingFallbackMode(true);
-          toast({
-            title: "Using emergency fallback mode",
-            description: "Camera access was problematic. Using a limited emergency mode.",
-            duration: 5000,
-          });
-          return emergencyStream;
-        }
+      logDebug("Falling back to emergency strategies");
+      const emergencyStream = await emergencyMediaFallback();
+      if (emergencyStream) {
+        setUsingFallbackMode(true);
+        toast({
+          title: "Camera access successful",
+          description: "Using simplified video mode.",
+          duration: 2000,
+        });
+        return emergencyStream;
       }
       
       throw error;
