@@ -23,10 +23,14 @@ interface RehearsalFormProps {
 }
 
 export default function RehearsalForm({ rehearsal, onSubmit, performanceId }: RehearsalFormProps) {
-  const [title, setTitle] = useState(rehearsal?.title || "");
+  const today = new Date();
+  const formattedDate = format(today, "MMM d");
+  
+  // Smart defaults with context-aware data
+  const [title, setTitle] = useState(rehearsal?.title || `Rehearsal - ${formattedDate}`);
   const [description, setDescription] = useState(rehearsal?.description || "");
   const [date, setDate] = useState<Date | undefined>(
-    rehearsal?.date ? new Date(rehearsal.date) : new Date()
+    rehearsal?.date ? new Date(rehearsal.date) : today
   );
   const [location, setLocation] = useState(rehearsal?.location || "");
   const [notes, setNotes] = useState(rehearsal?.notes || "");

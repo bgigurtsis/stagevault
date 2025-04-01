@@ -42,6 +42,7 @@ interface RecordingFormProps {
   onToggleVisibility?: () => void;
   performanceId?: string;
   rehearsalId?: string;
+  onCancel?: () => void;
 }
 
 export function RecordingForm({
@@ -54,7 +55,8 @@ export function RecordingForm({
   isMobile,
   onToggleVisibility,
   performanceId,
-  rehearsalId
+  rehearsalId,
+  onCancel
 }: RecordingFormProps) {
   const [title, setTitle] = useState("");
   const [selectedPerformance, setSelectedPerformance] = useState(performanceId || "");
@@ -73,6 +75,7 @@ export function RecordingForm({
   
   const { toast } = useToast();
   
+  // Generate smart default title
   useEffect(() => {
     if (!title) {
       const now = new Date();
@@ -135,7 +138,7 @@ export function RecordingForm({
     };
 
     fetchData();
-  }, [toast, performanceId, rehearsalId]);
+  }, [toast, performanceId, rehearsalId, selectedPerformance]);
   
   // Handle performance change and load associated rehearsals
   useEffect(() => {
@@ -149,7 +152,7 @@ export function RecordingForm({
           setAvailableRehearsals(rehearsals);
           
           // Only auto-select the first rehearsal if none is selected and we're not using a fixed rehearsal ID
-          if (rehearsals.length > 0 && !selectedRehearsal && !rehearsalId) {
+          if (rehearsals.length > 0 && !selectedRehearsal) {
             console.log("Auto-selecting first rehearsal:", rehearsals[0].id);
             setSelectedRehearsal(rehearsals[0].id);
           }
@@ -161,7 +164,7 @@ export function RecordingForm({
     };
 
     updateRehearsals();
-  }, [selectedPerformance, rehearsalId]);
+  }, [selectedPerformance, selectedRehearsal]);
 
   // Enhanced create performance function with better error handling
   const handleCreatePerformance = async (e?: React.MouseEvent) => {
@@ -380,7 +383,7 @@ export function RecordingForm({
                 name="performance"
                 value={selectedPerformance} 
                 onValueChange={setSelectedPerformance}
-                disabled={isUploading || isSubmitting || !!performanceId}
+                disabled={isUploading || isSubmitting}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select a performance" />
@@ -445,7 +448,7 @@ export function RecordingForm({
                 name="rehearsal"
                 value={selectedRehearsal} 
                 onValueChange={setSelectedRehearsal}
-                disabled={isUploading || isSubmitting || !selectedPerformance || !!rehearsalId}
+                disabled={isUploading || isSubmitting || !selectedPerformance}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select a rehearsal" />
@@ -516,7 +519,7 @@ export function RecordingForm({
         </div>
       </div>
       
-      <div className="mt-6">
+      <div className="mt-6 space-y-2">
         <Button 
           type="submit" 
           className="w-full"
@@ -526,6 +529,18 @@ export function RecordingForm({
           <Save className="mr-2 h-4 w-4" />
           Save Recording
         </Button>
+        
+        {onCancel && (
+          <Button 
+            type="button" 
+            variant="outline"
+            className="w-full"
+            onClick={onCancel}
+            disabled={isUploading || isSubmitting}
+          >
+            Cancel
+          </Button>
+        )}
         
         {(isUploading || isSubmitting) && (
           <p className="text-xs text-center mt-2 text-muted-foreground">

@@ -1,9 +1,8 @@
-
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { Video, ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button"; // Add this import
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { performanceService } from "@/services/performanceService";
 import { rehearsalService } from "@/services/rehearsalService";
@@ -100,6 +99,14 @@ export default function Record() {
   // Toggle form visibility function
   const toggleFormVisibility = () => {
     setIsFormVisible(!isFormVisible);
+  };
+  
+  // Handle cancel recording
+  const handleCancelRecording = () => {
+    stopCamera(); // Make sure to release camera resources
+    resetRecording(); // Reset recording state
+    setCameraInitialized(false); // Reset initialization state
+    navigate(-1); // Go back to previous page
   };
   
   // Load performance context
@@ -402,6 +409,7 @@ export default function Record() {
               uploadComplete={uploadComplete}
               isMobile={isMobile}
               onToggleVisibility={toggleFormVisibility}
+              onCancel={handleCancelRecording}
               rehearsalId={rehearsalIdParam || undefined}
               performanceId={performanceIdParam || currentPerformance?.id || undefined}
             />

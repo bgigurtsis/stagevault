@@ -1,9 +1,10 @@
 
-import { useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useParams, useSearchParams, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Rehearsal } from "@/types";
 import { rehearsalService } from "@/services/rehearsalService";
+import { performanceService } from "@/services/performanceService";
 import RehearsalForm from "@/components/RehearsalForm";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,14 +15,34 @@ export default function RehearsalNew() {
   const [loading, setLoading] = useState(false);
   const { performanceId: urlParamPerformanceId } = useParams();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const queryPerformanceId = searchParams.get("performanceId");
   
   // Use performanceId from either URL params or query params
   const performanceId = urlParamPerformanceId || queryPerformanceId || undefined;
+  const [contextTitle, setContextTitle] = useState<string | null>(null);
   
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isDriveConnected } = useAuth();
+
+  // Get context information from the current location
+  useEffect(() => {
+    const getContextInfo = async () => {
+      if (performanceId) {
+        try {
+          const performance = await performanceService.getPerformanceById(performanceId);
+          if (performance) {
+            setContextTitle(performance.title);
+          }
+        } catch (error) {
+          console.error("Error getting performance details:", error);
+        }
+      }
+    };
+    
+    getContextInfo();
+  }, [performanceId]);
 
   const handleCreateRehearsal = async (rehearsal: Omit<Rehearsal, "id" | "createdAt" | "updatedAt">): Promise<void> => {
     if (!isDriveConnected) {
@@ -80,7 +101,12 @@ export default function RehearsalNew() {
         >
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <h1 className="text-3xl font-bold tracking-tight">New Rehearsal</h1>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">New Rehearsal</h1>
+          {contextTitle && (
+            <p className="text-muted-foreground">For performance: {contextTitle}</p>
+          )}
+        </div>
       </div>
 
       {!isDriveConnected && (

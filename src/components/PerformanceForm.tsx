@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CalendarIcon, Users } from "lucide-react";
-import { format } from "date-fns";
+import { format, addMonths } from "date-fns";
 import { useAuth } from "@/hooks/useAuthContext";
 import { Performance } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -53,15 +53,26 @@ export function PerformanceForm({
   const navigate = useNavigate();
   const { users } = useAuth();
 
+  // Generate smart default title and dates
+  const generateDefaultValues = () => {
+    const now = new Date();
+    const monthYear = format(now, "MMMM yyyy");
+    const defaultTitle = performance?.title || `Performance - ${monthYear}`;
+    const defaultStartDate = performance?.startDate ? new Date(performance.startDate) : now;
+    const defaultEndDate = performance?.endDate ? new Date(performance.endDate) : addMonths(now, 1);
+    
+    return {
+      title: defaultTitle,
+      description: performance?.description || "",
+      startDate: defaultStartDate,
+      endDate: defaultEndDate,
+      taggedUsers: performance?.taggedUsers || [],
+    };
+  };
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      title: performance?.title || "",
-      description: performance?.description || "",
-      startDate: performance?.startDate ? new Date(performance.startDate) : undefined,
-      endDate: performance?.endDate ? new Date(performance.endDate) : undefined,
-      taggedUsers: performance?.taggedUsers || [],
-    },
+    defaultValues: generateDefaultValues(),
   });
 
   return (
