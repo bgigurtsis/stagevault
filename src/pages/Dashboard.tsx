@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Performance, Rehearsal, Recording } from "@/types";
@@ -22,34 +21,7 @@ export default function Dashboard() {
     const fetchData = async () => {
       try {
         const performancesData = await performanceService.getPerformances();
-        // Ensure each performance has a consistent patternType based on its ID
-        const enhancedPerformances = performancesData.map(performance => {
-          // Use the performance ID to determine a consistent pattern
-          const patternIndex = performance.id ? 
-            performance.id.charCodeAt(0) % 11 : 
-            Math.floor(Math.random() * 11);
-            
-          const patternTypes = [
-            "chevrons",
-            "octogons",
-            "overlappingCircles",
-            "plusSigns",
-            "xes", 
-            "hexagons",
-            "overlappingRings",
-            "nestedSquares",
-            "mosaicSquares",
-            "diamonds",
-            "tessellation"
-          ];
-          
-          return {
-            ...performance,
-            patternType: patternTypes[patternIndex]
-          };
-        });
-        
-        setPerformances(enhancedPerformances);
+        setPerformances(performancesData);
 
         const recentRehearsals = await rehearsalService.getRehearsals();
         setRecentRehearsals(recentRehearsals);
@@ -124,8 +96,20 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   <PerformanceThumbnail 
-                    title={performance.title} 
-                    patternType={performance.patternType}
+                  title={performance.title} 
+                  patternType={[
+                    "chevrons",
+                    "octogons",
+                    "overlappingCircles",
+                    "plusSigns",
+                    "xes", 
+                    "hexagons",
+                    "overlappingRings",
+                    "nestedSquares",
+                    "mosaicSquares",
+                    "diamonds",
+                    "tessellation"
+                  ]} 
                   />
                 </CardContent>
               </Card>

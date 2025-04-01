@@ -1,8 +1,7 @@
-
 import { useState } from "react";
 import { Link, Outlet, useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuthContext";
-import { Home, User, LogOut, Menu, X, Theater, Video, Calendar } from "lucide-react";
+import { Home, User, LogOut, Menu, X, Plus, Theater, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -48,16 +47,6 @@ export default function Layout() {
       path: "/performances",
       icon: <Theater className="h-5 w-5" />,
       label: "Performances"
-    },
-    {
-      path: "/rehearsals",
-      icon: <Calendar className="h-5 w-5" />,
-      label: "Rehearsals"
-    },
-    {
-      path: "/recordings",
-      icon: <Video className="h-5 w-5" />,
-      label: "Recordings"
     },
     {
       path: "/profile",
