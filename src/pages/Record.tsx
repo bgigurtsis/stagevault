@@ -42,12 +42,20 @@ export default function Record() {
     isInitializingCamera,
     cameraAccessError,
     flashEnabled,
+    isPermissionPermanentlyDenied,
     startCamera,
     switchCamera,
     toggleFlash,
     attemptScreenshareWithCamera,
-    setCameraAccessError
-  } = useCamera();
+    setCameraAccessError,
+    resetPermissions,
+    checkPermissionStatus,
+    stopCamera
+  } = useCamera({
+    onCameraError: (error) => {
+      console.log("Camera error handler called:", error);
+    }
+  });
   
   const {
     isRecording,
@@ -117,7 +125,7 @@ export default function Record() {
     loadPerformanceContext();
   }, [performanceIdParam, rehearsalIdParam]);
   
-  // Handle orientation changes
+  // Handle orientation changes and fullscreen behavior
   useEffect(() => {
     const handleOrientationChange = () => {
       if (isRecording && window.matchMedia("(orientation: landscape)").matches) {
@@ -128,28 +136,51 @@ export default function Record() {
     
     window.addEventListener('orientationchange', handleOrientationChange);
     
+    // Add class to body when recording to prevent scrolling
+    if (isRecording) {
+      document.body.classList.add('recording-active');
+    } else {
+      document.body.classList.remove('recording-active');
+    }
+    
     return () => {
       window.removeEventListener('orientationchange', handleOrientationChange);
+      document.body.classList.remove('recording-active');
     };
   }, [isRecording, requestFullscreen]);
   
   // Initialize camera and check browser compatibility
   useEffect(() => {
     checkBrowserCompatibility();
-    startCamera();
+    let initTimer: number;
+    
+    // Use a timeout to allow the component to fully mount
+    initTimer = window.setTimeout(() => {
+      startCamera();
+      checkPermissionStatus();
+    }, 500);
     
     // Force fullscreen mode on mobile
     if (isMobile) {
       const rootElement = document.documentElement;
       rootElement.style.height = '100vh';
       rootElement.style.overflow = 'hidden';
+    }
+    
+    // Cleanup function to ensure resources are properly released
+    return () => {
+      if (initTimer) {
+        window.clearTimeout(initTimer);
+      }
+      stopCamera();
       
-      return () => {
+      if (isMobile) {
+        const rootElement = document.documentElement;
         rootElement.style.height = '';
         rootElement.style.overflow = '';
-      };
-    }
-  }, []);
+      }
+    };
+  }, [isMobile, startCamera, checkPermissionStatus, stopCamera]);
   
   // Handle recording start
   const handleStartRecording = () => {
@@ -182,6 +213,18 @@ export default function Record() {
       saveRecording(recordedBlob, formElement);
     }
   };
+
+  // Handle retry camera access
+  const handleRetryCamera = () => {
+    setCameraAccessError(null);
+    startCamera();
+  };
+  
+  // Handle "go back" navigation
+  const handleGoBack = () => {
+    stopCamera(); // Make sure to release camera resources
+    navigate(-1);
+  };
   
   return (
     <div 
@@ -192,7 +235,8 @@ export default function Record() {
         <div className="top-nav">
           <button 
             className="bg-black/30 text-white p-2 rounded-full"
-            onClick={() => navigate(-1)}
+            onClick={handleGoBack}
+            aria-label="Go back"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
@@ -230,8 +274,9 @@ export default function Record() {
           {cameraAccessError && (
             <CameraError 
               errorMessage={cameraAccessError}
-              onRetry={() => startCamera()}
+              onRetry={handleRetryCamera}
               onScreenShare={attemptScreenshareWithCamera}
+              onResetPermissions={resetPermissions}
             />
           )}
 
@@ -310,7 +355,8 @@ export default function Record() {
       />
       
       {recordedBlob && (
-        <div className="mt-6 px-4">
+        <div className={`recording-form-container ${!isFormVisible ? 'hidden' : ''}`}>
+          <div className="recording-form-handle" onClick={toggleFormVisibility}></div>
           <form id="recording-form" className="space-y-4">
             <RecordingForm 
               isVisible={isFormVisible}
