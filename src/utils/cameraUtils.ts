@@ -1,4 +1,3 @@
-
 export const getSupportedMimeType = (): string => {
   const types = [
     'video/webm;codecs=vp9,opus',
