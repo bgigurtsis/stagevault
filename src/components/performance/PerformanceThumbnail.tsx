@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import GeoPattern, { GeneratorType } from 'geopattern';
 import { cn } from '@/lib/utils';
@@ -6,6 +5,7 @@ import { cn } from '@/lib/utils';
 interface PerformanceThumbnailProps {
   title: string;
   className?: string;
+  performanceId: string;
   fallbackIcon?: boolean;
   patternType?: GeneratorType | GeneratorType[];
 }
@@ -13,12 +13,13 @@ interface PerformanceThumbnailProps {
 export const PerformanceThumbnail: React.FC<PerformanceThumbnailProps> = ({ 
   title, 
   className = "",
+  performanceId,
   fallbackIcon = false,
   patternType
 }) => {
-  // Use consistent seed for pattern generation to ensure it doesn't change on refresh
-  // We'll use just the title as the seed so it stays consistent
-  const patternSeed = title;
+  // Use consistent seed for pattern generation with both title and performanceId
+  // This ensures the pattern remains consistent but unique to each performance
+  const patternSeed = `${title}-${performanceId}`;
 
   // Select a pattern type to use
   const selectedPatternType = useMemo(() => {
@@ -27,18 +28,29 @@ export const PerformanceThumbnail: React.FC<PerformanceThumbnailProps> = ({
     }
     
     if (Array.isArray(patternType)) {
-      // If it's an array, use a deterministic selection based on the title
-      const titleHash = title.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-      return patternType[titleHash % patternType.length];
+      // If it's an array, use a deterministic selection based on both title and performanceId
+      const combinedHash = `${title}${performanceId}`.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+      return patternType[combinedHash % patternType.length];
     }
     
     // If it's a single pattern type, use it
     return patternType;
-  }, [patternType, title]);
+  }, [patternType, title, performanceId]);
 
-  // Generate pattern using just the title as seed, instead of random elements
+  // Generate pattern using combined seed of title and performanceId
+  
+  // Generate a slightly different hue based on performanceId
+  const getColorVariation = () => {
+    // Extract a numeric hash from performanceId
+    const idHash = performanceId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    // Use the hash to create small variations in the orange base color
+    // This keeps it in the orange family but with subtle differences
+    const hueShift = (idHash % 40) - 20; // -20 to +19 shift
+    return `hsl(${30 + hueShift}, 85%, 65%)`; // Base is around 30 (orange)
+  };
+  
   const pattern = GeoPattern.generate(patternSeed, {
-    baseColor: '#9b87f5',
+    baseColor: getColorVariation(),
     generator: selectedPatternType
   });
   
