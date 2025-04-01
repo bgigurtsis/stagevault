@@ -49,8 +49,8 @@ class DataService {
     return rehearsalService.createRehearsal(rehearsalData);
   }
   
-  updateRehearsal(id: string, rehearsalData: Partial<CreateRehearsalData>): Promise<Rehearsal | null> {
-    return rehearsalService.updateRehearsal(id, rehearsalData);
+  updateRehearsal(rehearsalData: UpdateRehearsalData): Promise<Rehearsal | null> {
+    return rehearsalService.updateRehearsal(rehearsalData);
   }
   
   deleteRehearsal(id: string): Promise<boolean> {

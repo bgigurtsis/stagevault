@@ -39,28 +39,32 @@ export default function RehearsalEdit() {
   }, [rehearsalId, navigate, toast]);
 
   const handleUpdateRehearsal = async (updates: Omit<Rehearsal, "id" | "createdAt" | "updatedAt">) => {
-  if (!rehearsalId) return;
-  
-  try {
-    // Update to use the correct parameter signature
-    await rehearsalService.updateRehearsal(rehearsalId, updates);
+    if (!rehearsalId) return;
     
-    toast({
-      title: "Success",
-      description: "Rehearsal updated successfully!",
-    });
-    
-    navigate(`/rehearsals/${rehearsalId}`);
-  } catch (error) {
-    console.error("Error updating rehearsal:", error);
-    toast({
-      title: "Error",
-      description: "Failed to update rehearsal. Please try again.",
-      variant: "destructive",
-    });
-    throw error;
-  }
-};
+    try {
+      const rehearsalData = {
+        id: rehearsalId,
+        ...updates
+      };
+      
+      await rehearsalService.updateRehearsal(rehearsalData);
+      
+      toast({
+        title: "Success",
+        description: "Rehearsal updated successfully!",
+      });
+      
+      navigate(`/rehearsals/${rehearsalId}`);
+    } catch (error) {
+      console.error("Error updating rehearsal:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update rehearsal. Please try again.",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
 
   if (loading) {
     return (
