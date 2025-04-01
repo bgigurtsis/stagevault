@@ -20,6 +20,7 @@ export interface AuthContextType {
   loginWithGoogle: () => Promise<void>;
   signup: (name: string, email: string, password: string, role?: "performer" | "choreographer") => Promise<void>;
   logout: () => void;
+  user: User | null; // Added for backward compatibility
 }
 
 export interface AuthProviderProps {

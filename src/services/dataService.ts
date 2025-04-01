@@ -58,6 +58,15 @@ class DataService {
     return rehearsalService.deleteRehearsal(id);
   }
   
+  // Add an alias for getRehearsals to fix references to getAllRehearsals
+  getRehearsals(): Promise<Rehearsal[]> {
+    return rehearsalService.getRehearsals();
+  }
+  
+  getAllRehearsals(): Promise<Rehearsal[]> {
+    return rehearsalService.getRehearsals();
+  }
+  
   // Recording methods
   getRecentRecordings(limit?: number): Promise<Recording[]> {
     return recordingService.getRecentRecordings(limit);

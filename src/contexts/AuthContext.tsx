@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session } from "@supabase/supabase-js";
@@ -17,7 +16,8 @@ export const AuthContext = createContext<AuthContextType>({
   login: async () => {},
   loginWithGoogle: async () => {},
   signup: async () => {},
-  logout: async () => {}
+  logout: async () => {},
+  user: null // Added for backward compatibility
 });
 
 // Export the useAuth hook from the hook file
@@ -260,7 +260,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     login,
     loginWithGoogle,
     signup,
-    logout
+    logout,
+    user: currentUser // Added for backward compatibility
   };
 
   // Debug current authentication state on each render

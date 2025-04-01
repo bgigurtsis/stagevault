@@ -1,4 +1,12 @@
+
 import { v4 as uuidv4 } from 'uuid';
+
+// Format time in mm:ss format
+export const formatTime = (seconds: number): string => {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+  return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+};
 
 /**
  * Check if the browser supports the necessary APIs for camera access
@@ -277,4 +285,59 @@ export const emergencyMediaFallback = async (): Promise<MediaStream | null> => {
   
   console.warn('[CAMERA-DEBUG] All emergency strategies failed');
   return null;
+};
+
+/**
+ * Get supported mime type for recording
+ */
+export const getSupportedMimeType = (): string => {
+  const mimeTypes = [
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm;codecs=h264,opus',
+    'video/webm',
+    'video/mp4'
+  ];
+  
+  for (const mimeType of mimeTypes) {
+    if (MediaRecorder.isTypeSupported(mimeType)) {
+      console.log('Supported MIME type for recording:', mimeType);
+      return mimeType;
+    }
+  }
+  
+  console.warn('No preferred MIME types supported, falling back to default');
+  return '';
+};
+
+/**
+ * Check camera controls support
+ */
+export const getCameraControlsSupport = async (stream: MediaStream): Promise<{ 
+  flashSupported: boolean 
+}> => {
+  if (!stream) {
+    return { flashSupported: false };
+  }
+  
+  try {
+    const videoTrack = stream.getVideoTracks()[0];
+    if (!videoTrack) {
+      return { flashSupported: false };
+    }
+    
+    const capabilities = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
+    
+    // Check for torch/flash support - handle properties that might not exist
+    // in all browsers' MediaTrackCapabilities implementation
+    const hasCapabilitiesApi = !!videoTrack.getCapabilities;
+    const hasTorch = hasCapabilitiesApi && 
+                    capabilities && 
+                    (capabilities as any).torch === true;
+    
+    return { flashSupported: !!hasTorch };
+  } catch (error) {
+    console.error('[CAMERA-DEBUG] Error checking camera capabilities:', error);
+    return { flashSupported: false };
+  }
 };

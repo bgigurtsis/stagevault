@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -39,11 +38,11 @@ export default function RehearsalEdit() {
     fetchRehearsal();
   }, [rehearsalId, navigate, toast]);
 
-  const handleUpdateRehearsal = async (updates: Omit<Rehearsal, "id" | "createdAt" | "updatedAt">) => {
+  const handleUpdateRehearsal = async (updatedData: Omit<Rehearsal, "id" | "createdAt" | "updatedAt">) => {
     if (!rehearsalId) return;
     
     try {
-      await rehearsalService.updateRehearsal(rehearsalId, updates);
+      await rehearsalService.updateRehearsal(rehearsalId, updatedData);
       
       toast({
         title: "Success",

@@ -23,7 +23,7 @@ export default function Rehearsals() {
     const fetchData = async () => {
       try {
         // Fetch all rehearsals
-        const rehearsalsData = await rehearsalService.getAllRehearsals();
+        const rehearsalsData = await rehearsalService.getRehearsals();
         setRehearsals(rehearsalsData);
 
         // Fetch all performances to map them to rehearsals

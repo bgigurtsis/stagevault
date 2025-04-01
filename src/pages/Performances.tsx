@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -73,12 +72,12 @@ export default function Performances() {
   });
   
   const { 
-    data: rehearsals = [],
+    data: rehearsalsData = [],
     isLoading: isLoadingRehearsals
   } = useQuery({
     queryKey: ["rehearsals"],
     queryFn: async () => {
-      return await rehearsalService.getAllRehearsals();
+      return await rehearsalService.getRehearsals();
     }
   });
 
@@ -139,7 +138,7 @@ export default function Performances() {
   };
   
   const getRehearsalCount = (performanceId: string) => {
-    return rehearsals.filter(rehearsal => rehearsal.performanceId === performanceId).length;
+    return rehearsalsData.filter(rehearsal => rehearsal.performanceId === performanceId).length;
   };
 
   const getUserById = (userId: string) => {
