@@ -42,14 +42,20 @@ export default function Record() {
     isInitializingCamera,
     cameraAccessError,
     flashEnabled,
+    isPermissionPermanentlyDenied,
     startCamera,
     switchCamera,
     toggleFlash,
     attemptScreenshareWithCamera,
     setCameraAccessError,
     resetPermissions,
-    checkPermissionStatus
-  } = useCamera();
+    checkPermissionStatus,
+    stopCamera
+  } = useCamera({
+    onCameraError: (error) => {
+      console.log("Camera error handler called:", error);
+    }
+  });
   
   const {
     isRecording,
@@ -146,9 +152,10 @@ export default function Record() {
   // Initialize camera and check browser compatibility
   useEffect(() => {
     checkBrowserCompatibility();
+    let initTimer: number;
     
     // Use a timeout to allow the component to fully mount
-    const initTimer = setTimeout(() => {
+    initTimer = window.setTimeout(() => {
       startCamera();
       checkPermissionStatus();
     }, 500);
@@ -158,18 +165,22 @@ export default function Record() {
       const rootElement = document.documentElement;
       rootElement.style.height = '100vh';
       rootElement.style.overflow = 'hidden';
-      
-      return () => {
-        rootElement.style.height = '';
-        rootElement.style.overflow = '';
-        clearTimeout(initTimer);
-      };
     }
     
+    // Cleanup function to ensure resources are properly released
     return () => {
-      clearTimeout(initTimer);
+      if (initTimer) {
+        window.clearTimeout(initTimer);
+      }
+      stopCamera();
+      
+      if (isMobile) {
+        const rootElement = document.documentElement;
+        rootElement.style.height = '';
+        rootElement.style.overflow = '';
+      }
     };
-  }, []);
+  }, [isMobile, startCamera, checkPermissionStatus, stopCamera]);
   
   // Handle recording start
   const handleStartRecording = () => {
@@ -209,6 +220,12 @@ export default function Record() {
     startCamera();
   };
   
+  // Handle "go back" navigation
+  const handleGoBack = () => {
+    stopCamera(); // Make sure to release camera resources
+    navigate(-1);
+  };
+  
   return (
     <div 
       className={`record-container ${isRecording || recordedBlob ? 'fullscreen-recording' : ''}`}
@@ -218,7 +235,8 @@ export default function Record() {
         <div className="top-nav">
           <button 
             className="bg-black/30 text-white p-2 rounded-full"
-            onClick={() => navigate(-1)}
+            onClick={handleGoBack}
+            aria-label="Go back"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>

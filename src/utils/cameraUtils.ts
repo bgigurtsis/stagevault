@@ -117,12 +117,50 @@ export const getDeviceInfo = (): Record<string, string | boolean> => {
     language: navigator.language,
     isOnline: navigator.onLine,
     screen: `${window.screen.width}x${window.screen.height}`,
-    colorDepth: String(window.screen.colorDepth), // Convert number to string
-    devicePixelRatio: String(window.devicePixelRatio), // Convert number to string
+    colorDepth: String(window.screen.colorDepth),
+    devicePixelRatio: String(window.devicePixelRatio),
     isMobile: /iPhone|iPad|iPod|Android/i.test(navigator.userAgent),
     isIOS: /iPhone|iPad|iPod/i.test(navigator.userAgent),
     isAndroid: /Android/i.test(navigator.userAgent),
     browserName: getBrowserName(),
     browserVersion: getBrowserVersion()
   };
+};
+
+// New utility function to manually open browser settings
+export const openBrowserPermissionSettings = (): void => {
+  const browserName = getBrowserName();
+  let helpUrl = '';
+  
+  switch(browserName) {
+    case 'Chrome':
+    case 'Edge':
+      helpUrl = 'chrome://settings/content/camera';
+      break;
+    case 'Firefox':
+      helpUrl = 'about:preferences#privacy';
+      break;
+    case 'Safari':
+      helpUrl = 'https://support.apple.com/guide/safari/websites-ibrwe2159f50/mac';
+      break;
+    default:
+      helpUrl = 'https://support.google.com/chrome/answer/114662?hl=en&co=GENIE.Platform%3DDesktop';
+  }
+  
+  // For browsers that support it, open a popup with instructions
+  try {
+    window.open(helpUrl, '_blank');
+  } catch (error) {
+    console.warn('Could not open browser settings URL:', error);
+  }
+};
+
+// Determine if there's likely a permanent camera block
+export const isProbablyPermanentlyBlocked = (errorMessage: string): boolean => {
+  // The specific error message varies by browser
+  return (
+    errorMessage.includes('denied') || 
+    errorMessage.includes('NotAllowedError') ||
+    errorMessage.includes('Permission denied')
+  );
 };

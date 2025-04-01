@@ -1,6 +1,12 @@
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { 
+  checkBrowserCompatibility, 
+  isCameraPermissionPersistentlyDenied,
+  openBrowserPermissionSettings,
+  isProbablyPermanentlyBlocked
+} from "@/utils/cameraUtils";
 
 interface UseCameraOptions {
   onCameraError?: (error: string) => void;
@@ -14,6 +20,7 @@ export const useCamera = (options?: UseCameraOptions) => {
   const [usingFallbackMode, setUsingFallbackMode] = useState(false);
   const [flashEnabled, setFlashEnabled] = useState(false);
   const [permissionState, setPermissionState] = useState<PermissionState | null>(null);
+  const [isPermissionPermanentlyDenied, setIsPermissionPermanentlyDenied] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -35,9 +42,14 @@ export const useCamera = (options?: UseCameraOptions) => {
         const cameraPermission = await navigator.permissions.query({ name: 'camera' as PermissionName });
         setPermissionState(cameraPermission.state);
         
+        // Update permanent denial status
+        setIsPermissionPermanentlyDenied(cameraPermission.state === 'denied');
+        
         // Listen for permission changes
         cameraPermission.addEventListener('change', () => {
           setPermissionState(cameraPermission.state);
+          setIsPermissionPermanentlyDenied(cameraPermission.state === 'denied');
+          
           if (cameraPermission.state === 'granted') {
             setCameraAccessError(null);
             startCamera();
@@ -126,24 +138,30 @@ export const useCamera = (options?: UseCameraOptions) => {
     }
   };
   
-  const resetPermissions = async () => {
-    // We can't programmatically reset permissions, but we can guide the user
-    setCameraAccessError("Browser permissions can't be reset programmatically. Please follow these steps:\n1. Click the lock/camera icon in your address bar\n2. Reset permissions for this site\n3. Refresh the page");
+  const resetPermissions = useCallback(() => {
+    // We can only guide the user to reset permissions manually
+    openBrowserPermissionSettings();
     
     toast({
       title: "Permission Reset Instructions",
-      description: "Please check the camera icon in your browser's address bar to reset permissions.",
+      description: "Please check your browser settings to reset camera permissions, then refresh this page.",
       duration: 6000,
     });
-  };
+  }, [toast]);
   
-  const startCamera = async (deviceId?: string) => {
+  const startCamera = useCallback(async (deviceId?: string) => {
     try {
       setCameraAccessError(null);
       setIsInitializingCamera(true);
       
       // Check permission status first
-      await checkPermissionStatus();
+      const permissionState = await checkPermissionStatus();
+      
+      // If permissions are already denied, show helpful message
+      if (permissionState === 'denied') {
+        setIsPermissionPermanentlyDenied(true);
+        throw new Error("Camera access is permanently denied. Please update your browser settings.");
+      }
       
       const stream = await tryAccessCamera(1, deviceId);
       
@@ -165,9 +183,19 @@ export const useCamera = (options?: UseCameraOptions) => {
       let errorMessage = "Failed to access camera and microphone.";
       
       if (error instanceof Error) {
+        errorMessage = error.message;
+        
         if (error.name === "NotAllowedError") {
           errorMessage = "Camera access denied. Please allow access in your browser settings and try again.";
           await checkPermissionStatus(); // Update permission state
+          
+          // Check if this is likely a permanent denial
+          const isPermanent = await isCameraPermissionPersistentlyDenied();
+          setIsPermissionPermanentlyDenied(isPermanent);
+          
+          if (isPermanent) {
+            errorMessage = "Camera access is permanently denied by your browser. Please update your settings to allow access.";
+          }
         } else if (error.name === "NotFoundError") {
           errorMessage = "No camera detected. Please connect a camera and try again.";
         } else if (error.name === "NotReadableError") {
@@ -186,9 +214,9 @@ export const useCamera = (options?: UseCameraOptions) => {
         variant: "destructive",
       });
     }
-  };
+  }, [toast, options]);
   
-  const switchCamera = async () => {
+  const switchCamera = useCallback(async () => {
     // Stop existing camera stream
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
@@ -204,9 +232,9 @@ export const useCamera = (options?: UseCameraOptions) => {
     
     setSelectedCameraId(nextCamera.deviceId);
     startCamera(nextCamera.deviceId);
-  };
+  }, [selectedCameraId, startCamera]);
   
-  const toggleFlash = async () => {
+  const toggleFlash = useCallback(async () => {
     if (!streamRef.current) return;
     
     try {
@@ -248,16 +276,16 @@ export const useCamera = (options?: UseCameraOptions) => {
         variant: "destructive",
       });
     }
-  };
+  }, [flashEnabled, toast]);
   
-  const stopCamera = () => {
+  const stopCamera = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
-  };
+  }, []);
   
-  const attemptScreenshareWithCamera = async () => {
+  const attemptScreenshareWithCamera = useCallback(async () => {
     try {
       logDebug("Attempting screenshare with camera fallback");
       setCameraAccessError(null);
@@ -302,14 +330,16 @@ export const useCamera = (options?: UseCameraOptions) => {
       
       throw error;
     }
-  };
+  }, [toast]);
   
   // Clean up on unmount
   useEffect(() => {
+    checkBrowserCompatibility();
+    
     return () => {
       stopCamera();
     };
-  }, []);
+  }, [stopCamera]);
   
   return {
     videoRef,
@@ -321,6 +351,7 @@ export const useCamera = (options?: UseCameraOptions) => {
     flashEnabled,
     usingFallbackMode,
     permissionState,
+    isPermissionPermanentlyDenied,
     startCamera,
     stopCamera,
     switchCamera,
