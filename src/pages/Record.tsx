@@ -206,7 +206,7 @@ export default function Record() {
       {currentPerformance && !isRecording && !recordedBlob && (
         <div className="performance-badge">
           <Badge className="bg-primary/90 text-white px-3 py-1">
-            For: {currentPerformance.title}
+            {currentPerformance.title}
           </Badge>
         </div>
       )}
