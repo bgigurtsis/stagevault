@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -51,7 +50,7 @@ export function PerformanceForm({
 }: PerformanceFormProps) {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { users, user } = useAuth();
+  const { users } = useAuth();
 
   // Generate smart default title and dates
   const generateDefaultValues = () => {

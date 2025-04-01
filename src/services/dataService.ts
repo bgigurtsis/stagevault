@@ -1,4 +1,3 @@
-
 import { Performance, Rehearsal, Recording } from "@/types";
 import { performanceService, CreatePerformanceData, UpdatePerformanceData } from "./performanceService";
 import { rehearsalService, CreateRehearsalData, UpdateRehearsalData } from "./rehearsalService";

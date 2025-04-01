@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -40,27 +39,28 @@ export default function RehearsalEdit() {
   }, [rehearsalId, navigate, toast]);
 
   const handleUpdateRehearsal = async (updates: Omit<Rehearsal, "id" | "createdAt" | "updatedAt">) => {
-    if (!rehearsalId) return;
+  if (!rehearsalId) return;
+  
+  try {
+    // Update to use the correct parameter signature
+    await rehearsalService.updateRehearsal(rehearsalId, updates);
     
-    try {
-      await rehearsalService.updateRehearsal(rehearsalId, updates);
-      
-      toast({
-        title: "Success",
-        description: "Rehearsal updated successfully!",
-      });
-      
-      navigate(`/rehearsals/${rehearsalId}`);
-    } catch (error) {
-      console.error("Error updating rehearsal:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update rehearsal. Please try again.",
-        variant: "destructive",
-      });
-      throw error;
-    }
-  };
+    toast({
+      title: "Success",
+      description: "Rehearsal updated successfully!",
+    });
+    
+    navigate(`/rehearsals/${rehearsalId}`);
+  } catch (error) {
+    console.error("Error updating rehearsal:", error);
+    toast({
+      title: "Error",
+      description: "Failed to update rehearsal. Please try again.",
+      variant: "destructive",
+    });
+    throw error;
+  }
+};
 
   if (loading) {
     return (

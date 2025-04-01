@@ -1,6 +1,65 @@
 import { v4 as uuidv4 } from 'uuid';
 
 /**
+ * Camera utilities for handling video recording and camera access
+ */
+
+// Format time (mm:ss) for display in recording UI
+export const formatTime = (seconds: number): string => {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+};
+
+// Get supported video mime type for recording
+export const getSupportedMimeType = (): string => {
+  const possibleTypes = [
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm;codecs=h264,opus',
+    'video/mp4;codecs=h264,aac',
+    'video/webm',
+    'video/mp4'
+  ];
+
+  for (const mimeType of possibleTypes) {
+    if (MediaRecorder.isTypeSupported(mimeType)) {
+      console.log(`Using mime type: ${mimeType}`);
+      return mimeType;
+    }
+  }
+
+  console.log('No supported mime type found, using default video/webm');
+  return 'video/webm';
+};
+
+// Check which camera controls are supported
+export const getCameraControlsSupport = async (stream: MediaStream): Promise<{
+  flashSupported: boolean;
+  zoomSupported: boolean;
+}> => {
+  if (!stream) {
+    return { flashSupported: false, zoomSupported: false };
+  }
+
+  try {
+    const videoTrack = stream.getVideoTracks()[0];
+    if (!videoTrack) {
+      return { flashSupported: false, zoomSupported: false };
+    }
+
+    const capabilities = videoTrack.getCapabilities();
+    const flashSupported = capabilities && 'torch' in capabilities;
+    const zoomSupported = capabilities && 'zoom' in capabilities;
+
+    return { flashSupported, zoomSupported };
+  } catch (error) {
+    console.error('Error checking camera capabilities:', error);
+    return { flashSupported: false, zoomSupported: false };
+  }
+};
+
+/**
  * Check if the browser supports the necessary APIs for camera access
  */
 export const checkBrowserCompatibility = (): boolean => {
