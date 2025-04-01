@@ -287,7 +287,6 @@ export default function Performances() {
                 "xes", 
                 "hexagons",
                 "overlappingRings",
-                "triangles",
                 "nestedSquares",
                 "mosaicSquares",
                 "diamonds",

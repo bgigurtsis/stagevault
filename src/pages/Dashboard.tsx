@@ -105,7 +105,6 @@ export default function Dashboard() {
                     "xes", 
                     "hexagons",
                     "overlappingRings",
-                    "triangles",
                     "nestedSquares",
                     "mosaicSquares",
                     "diamonds",
