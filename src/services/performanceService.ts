@@ -1,249 +1,194 @@
 
-import { BaseService } from "./baseService";
-import { Performance, PerformanceStatus } from "@/types";
+import { Performance } from "@/types";
+import { dataService } from "./dataService";
 import { googleDriveService } from "./googleDriveService";
 
 export interface CreatePerformanceData {
   title: string;
   description?: string;
+  startDate: string;
+  endDate?: string;
+  status?: "upcoming" | "active" | "completed" | "canceled";
+  venue?: string;
+  coverImage?: string;
+  userId: string;
+  taggedUsers?: string[];
+  createdBy?: string;
+}
+
+export interface UpdatePerformanceData {
+  id: string;
+  title?: string;
+  description?: string;
   startDate?: string;
   endDate?: string;
+  status?: "upcoming" | "active" | "completed" | "canceled";
+  venue?: string;
+  coverImage?: string;
   taggedUsers?: string[];
-  createdBy: string;
-  status?: PerformanceStatus;
-  userId: string;
 }
 
-export interface UpdatePerformanceData extends Partial<CreatePerformanceData> {
-  id: string;
-}
+// Mock data helpers
+const transformPerformanceData = (data: any): Performance => {
+  return {
+    id: data.id,
+    title: data.title,
+    description: data.description || "",
+    startDate: data.start_date,
+    endDate: data.end_date,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+    status: data.status || "upcoming",  // Add default status if missing
+    venue: data.venue || "",
+    coverImage: data.cover_image,
+    userId: data.created_by || "",
+    createdBy: data.created_by,
+    taggedUsers: data.tagged_users || [],
+    driveFolderId: data.drive_folder_id
+  };
+};
 
-export class PerformanceService extends BaseService {
-  async getPerformances(): Promise<Performance[]> {
-    const { data, error } = await this.supabase
-      .from("performances")
-      .select("*")
-      .order("created_at", { ascending: false });
-    
-    if (error) {
-      console.error("Error fetching performances:", error);
-      return [];
-    }
-    
-    return data.map(p => ({
-      id: p.id,
-      title: p.title,
-      description: p.description || undefined,
-      startDate: p.start_date || undefined,
-      endDate: p.end_date || undefined,
-      createdAt: p.created_at,
-      updatedAt: p.updated_at,
-      createdBy: p.created_by,
-      taggedUsers: p.tagged_users || [],
-      driveFolderId: p.drive_folder_id || undefined,
-      status: (p.status as PerformanceStatus) || "upcoming",
-      userId: p.created_by, // Using created_by as userId for compatibility
-      coverImage: p.cover_image
-    }));
+// Service methods
+const getPerformances = async (): Promise<Performance[]> => {
+  try {
+    const response = await dataService.get("/performances");
+    return Array.isArray(response) 
+      ? response.map(transformPerformanceData) 
+      : [];
+  } catch (error) {
+    console.error("Error fetching performances:", error);
+    return [];
   }
-  
-  async getPerformanceById(id: string): Promise<Performance | null> {
-    console.log(`Fetching performance with ID: ${id}`);
+};
+
+const getPerformanceById = async (id: string): Promise<Performance | null> => {
+  try {
+    const response = await dataService.get(`/performances/${id}`);
     
-    const { data, error } = await this.supabase
-      .from("performances")
-      .select("*")
-      .eq("id", id)
-      .single();
+    if (!response) return null;
     
-    if (error) {
-      console.error("Error fetching performance:", error);
-      return null;
-    }
+    console.log("Performance data retrieved:", response);
     
-    if (!data) {
-      console.error("No performance found with ID:", id);
-      return null;
-    }
-    
-    console.log("Performance data retrieved:", data);
-    
-    return {
-      id: data.id,
-      title: data.title,
-      description: data.description || undefined,
-      startDate: data.start_date || undefined,
-      endDate: data.end_date || undefined,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-      createdBy: data.created_by,
-      taggedUsers: data.tagged_users || [],
-      driveFolderId: data.drive_folder_id || undefined,
-      status: (data.status as PerformanceStatus) || "upcoming",
-      userId: data.created_by, // Using created_by as userId for compatibility
-      coverImage: data.cover_image
+    return transformPerformanceData(response);
+  } catch (error) {
+    console.error(`Error fetching performance with ID ${id}:`, error);
+    return null;
+  }
+};
+
+const createPerformance = async (performanceData: CreatePerformanceData): Promise<Performance | null> => {
+  try {
+    // Convert to DB format with snake_case
+    const dbData = {
+      title: performanceData.title,
+      description: performanceData.description,
+      start_date: performanceData.startDate,
+      end_date: performanceData.endDate,
+      status: performanceData.status || "upcoming",
+      venue: performanceData.venue,
+      cover_image: performanceData.coverImage,
+      created_by: performanceData.userId || performanceData.createdBy,
+      tagged_users: performanceData.taggedUsers || []
     };
-  }
-  
-  async createPerformance(performanceData: CreatePerformanceData): Promise<Performance | null> {
-    console.log("Creating performance with data:", performanceData);
     
-    try {
-      // Create folder in Google Drive
-      let driveFolderId: string | null = null;
-      
+    console.log("Creating performance with data:", dbData);
+    
+    const response = await dataService.post("/performances", dbData);
+    
+    if (!response) {
+      throw new Error("No response from server when creating performance");
+    }
+    
+    console.log("Created performance:", response);
+    
+    // Create Google Drive folder for the performance
+    if (response.id) {
       try {
-        console.log("Creating performance folder in Google Drive for:", performanceData.title);
-        driveFolderId = await googleDriveService.createPerformanceFolder(performanceData.title);
-        
-        if (driveFolderId) {
-          console.log(`Successfully created performance folder with ID: ${driveFolderId}`);
-        } else {
-          console.warn("Could not create Google Drive folder for performance. Will continue without folder ID.");
+        const folderResponse = await googleDriveService.createPerformanceFolder(response.title);
+        if (folderResponse?.id) {
+          // Update performance with the folder ID
+          const updateResponse = await dataService.put(`/performances/${response.id}`, {
+            drive_folder_id: folderResponse.id
+          });
+          console.log("Updated performance with Drive folder ID:", updateResponse);
+          
+          // If successful update, update our response object
+          if (updateResponse) {
+            response.drive_folder_id = folderResponse.id;
+          }
         }
       } catch (driveError) {
-        console.error("Error creating Google Drive folder for performance:", driveError);
-        // Continue with DB insert even if folder creation fails
+        console.error("Error creating Google Drive folder:", driveError);
+        // Continue even if folder creation fails
       }
+    }
+    
+    return transformPerformanceData(response);
+  } catch (error) {
+    console.error("Error creating performance:", error);
+    return null;
+  }
+};
 
-      // Insert performance into the database
-      const { data, error } = await this.supabase
-        .from("performances")
-        .insert({
-          title: performanceData.title,
-          description: performanceData.description,
-          start_date: performanceData.startDate,
-          end_date: performanceData.endDate,
-          tagged_users: performanceData.taggedUsers,
-          created_by: performanceData.createdBy,
-          drive_folder_id: driveFolderId,
-          status: performanceData.status || "upcoming",
-          user_id: performanceData.userId
-        })
-        .select()
-        .single();
-      
-      if (error) {
-        console.error("Error creating performance:", error);
-        return null;
-      }
-      
-      console.log("Performance created successfully:", data);
-      
-      return {
-        id: data.id,
-        title: data.title,
-        description: data.description || undefined,
-        startDate: data.start_date || undefined,
-        endDate: data.end_date || undefined,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-        createdBy: data.created_by,
-        taggedUsers: data.tagged_users || [],
-        driveFolderId: data.drive_folder_id || undefined,
-        status: (data.status as PerformanceStatus) || "upcoming",
-        userId: data.created_by, // Using created_by as userId for compatibility
-        coverImage: data.cover_image
-      };
-    } catch (error) {
-      console.error("Unexpected error during performance creation:", error);
-      return null;
-    }
-  }
-  
-  async updatePerformance(performanceData: UpdatePerformanceData): Promise<Performance | null> {
-    const updateData: any = {};
-    
-    if (performanceData.title !== undefined) updateData.title = performanceData.title;
-    if (performanceData.description !== undefined) updateData.description = performanceData.description;
-    if (performanceData.startDate !== undefined) updateData.start_date = performanceData.startDate;
-    if (performanceData.endDate !== undefined) updateData.end_date = performanceData.endDate;
-    if (performanceData.taggedUsers !== undefined) updateData.tagged_users = performanceData.taggedUsers;
-    if (performanceData.status !== undefined) updateData.status = performanceData.status;
-    if (performanceData.userId !== undefined) updateData.user_id = performanceData.userId;
-    
-    const { data, error } = await this.supabase
-      .from("performances")
-      .update(updateData)
-      .eq("id", performanceData.id)
-      .select()
-      .single();
-    
-    if (error) {
-      console.error("Error updating performance:", error);
-      return null;
+const updatePerformance = async (performanceData: UpdatePerformanceData): Promise<Performance | null> => {
+  try {
+    if (!performanceData.id) {
+      throw new Error("Performance ID is required for updates");
     }
     
-    return {
-      id: data.id,
-      title: data.title,
-      description: data.description || undefined,
-      startDate: data.start_date || undefined,
-      endDate: data.end_date || undefined,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-      createdBy: data.created_by,
-      taggedUsers: data.tagged_users || [],
-      driveFolderId: data.drive_folder_id || undefined,
-      status: (data.status as PerformanceStatus) || "upcoming",
-      userId: data.created_by, // Using created_by as userId for compatibility
-      coverImage: data.cover_image
-    };
+    // Convert to DB format with snake_case
+    const dbData: any = {};
+    
+    if (performanceData.title !== undefined) dbData.title = performanceData.title;
+    if (performanceData.description !== undefined) dbData.description = performanceData.description;
+    if (performanceData.startDate !== undefined) dbData.start_date = performanceData.startDate;
+    if (performanceData.endDate !== undefined) dbData.end_date = performanceData.endDate;
+    if (performanceData.status !== undefined) dbData.status = performanceData.status;
+    if (performanceData.venue !== undefined) dbData.venue = performanceData.venue;
+    if (performanceData.coverImage !== undefined) dbData.cover_image = performanceData.coverImage;
+    if (performanceData.taggedUsers !== undefined) dbData.tagged_users = performanceData.taggedUsers;
+    
+    console.log(`Updating performance ${performanceData.id} with data:`, dbData);
+    
+    const response = await dataService.put(`/performances/${performanceData.id}`, dbData);
+    
+    return response ? transformPerformanceData(response) : null;
+  } catch (error) {
+    console.error(`Error updating performance with ID ${performanceData.id}:`, error);
+    return null;
   }
-  
-  async deletePerformance(id: string): Promise<boolean> {
-    try {
-      console.log(`Starting deletion process for performance with ID: ${id}`);
-      
-      // First, get the performance to retrieve the Drive folder ID
-      const performance = await this.getPerformanceById(id);
-      
-      // Prepare for database deletion regardless of Drive folder success
-      const deleteDatabaseRecord = async () => {
-        console.log(`Deleting performance from database, ID: ${id}`);
-        const { error } = await this.supabase
-          .from("performances")
-          .delete()
-          .eq("id", id);
-        
-        if (error) {
-          console.error("Error deleting performance from database:", error);
-          throw new Error(`Database deletion failed: ${error.message}`);
-        }
-        
-        console.log(`Successfully deleted performance ${id} from database`);
-        return true;
-      };
-      
-      // If there's no Drive folder or no performance found, just delete from database
-      if (!performance || !performance.driveFolderId) {
-        console.log(`No Drive folder found for performance ${id}, proceeding with database deletion only`);
-        return await deleteDatabaseRecord();
-      }
-      
-      // Try to delete the Google Drive folder, but continue with DB deletion even if it fails
+};
+
+const deletePerformance = async (id: string): Promise<boolean> => {
+  try {
+    // First try to get the performance to check if it has a Drive folder
+    const performance = await getPerformanceById(id);
+    
+    // Delete from the database first
+    await dataService.delete(`/performances/${id}`);
+    
+    // Then try to delete the associated Google Drive folder if it exists
+    if (performance && performance.driveFolderId) {
       try {
-        console.log(`Attempting to delete Google Drive folder with ID: ${performance.driveFolderId}`);
-        const folderDeleted = await googleDriveService.deleteFolder(performance.driveFolderId);
-        
-        if (folderDeleted) {
-          console.log(`Successfully deleted Google Drive folder for performance: ${id}`);
-        } else {
-          console.warn(`Failed to delete Google Drive folder for performance: ${id}, but will continue with database deletion`);
-        }
+        await googleDriveService.deleteFolder(performance.driveFolderId);
+        console.log(`Deleted Google Drive folder ${performance.driveFolderId} for performance ${id}`);
       } catch (driveError) {
-        // Log the error but don't throw - we still want to delete the database record
         console.error(`Error deleting Google Drive folder for performance ${id}:`, driveError);
-        console.log(`Continuing with database deletion despite Drive folder deletion failure`);
+        // Continue even if folder deletion fails
       }
-      
-      // Proceed with database deletion
-      return await deleteDatabaseRecord();
-    } catch (error) {
-      console.error("Unexpected error during performance deletion:", error);
-      throw error; // Re-throw to allow caller to handle it
     }
+    
+    return true;
+  } catch (error) {
+    console.error(`Error deleting performance with ID ${id}:`, error);
+    return false;
   }
-}
+};
 
-export const performanceService = new PerformanceService();
+export const performanceService = {
+  getPerformances,
+  getPerformanceById,
+  createPerformance,
+  updatePerformance,
+  deletePerformance,
+};

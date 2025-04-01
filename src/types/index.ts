@@ -1,6 +1,5 @@
 
-import { User } from "../contexts/types";
-
+// Let's update the Performance and Recording types to match what's being used
 export type PerformanceStatus = "upcoming" | "active" | "completed" | "canceled";
 
 export interface Performance {
@@ -15,7 +14,6 @@ export interface Performance {
   venue?: string;
   coverImage?: string | null;
   userId: string;
-  patternType?: string;
   taggedUsers?: string[];
   createdBy?: string;
   driveFolderId?: string | null;

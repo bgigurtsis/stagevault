@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { 
   Save, 
@@ -218,7 +217,7 @@ export function RecordingForm({
   }, [selectedPerformance, selectedRehearsal]);
 
   // Enhanced create performance function with better error handling
-  const handleCreatePerformance = async (e?: React.MouseEvent) => {
+  const createPerformanceHandler = async () => {
     e?.preventDefault();
     
     if (!newPerformanceTitle.trim()) {
@@ -246,7 +245,8 @@ export function RecordingForm({
       const newPerformance = await performanceService.createPerformance({
         title: newPerformanceTitle,
         startDate: new Date().toISOString().split('T')[0],
-        createdBy: user.id // Use the actual user ID instead of "current-user"
+        createdBy: user?.id || "",
+        userId: user?.id || ""
       });
       
       console.log("New performance created:", newPerformance);
@@ -452,7 +452,7 @@ export function RecordingForm({
                       type="button" 
                       size="sm" 
                       variant="default"
-                      onClick={handleCreatePerformance}
+                      onClick={createPerformanceHandler}
                       disabled={isUploading || isSubmitting}
                     >
                       Create
