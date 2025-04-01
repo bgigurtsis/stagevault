@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { Video, ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button"; // Add this import
 import { useToast } from "@/hooks/use-toast";
 import { performanceService } from "@/services/performanceService";
 import { rehearsalService } from "@/services/rehearsalService";
