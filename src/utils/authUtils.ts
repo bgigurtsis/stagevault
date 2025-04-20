@@ -4,8 +4,14 @@ import { User } from "@/contexts/types";
 
 /**
  * Extract user information from Supabase user object
+ * Implemented with thorough error handling to avoid undefined values
  */
 export const extractUserInfo = (user: SupabaseUser): User => {
+  if (!user) {
+    console.error("Cannot extract user info: user object is undefined");
+    throw new Error("Invalid user object");
+  }
+  
   console.log("Extracting user info for user:", user.id);
   
   // Safely get name, ensuring we always have a string even if metadata is incomplete
@@ -13,14 +19,17 @@ export const extractUserInfo = (user: SupabaseUser): User => {
     try {
       // Check if user metadata exists and contains name information
       if (user.user_metadata) {
-        if (user.user_metadata.name) return user.user_metadata.name;
-        if (user.user_metadata.full_name) return user.user_metadata.full_name;
+        if (typeof user.user_metadata.name === 'string' && user.user_metadata.name) 
+          return user.user_metadata.name;
+        
+        if (typeof user.user_metadata.full_name === 'string' && user.user_metadata.full_name) 
+          return user.user_metadata.full_name;
       }
       
       // If no name in metadata, try to extract from email
-      if (user.email) {
+      if (user.email && typeof user.email === 'string') {
         const emailParts = user.email.split('@');
-        return emailParts[0] || "User";
+        if (emailParts[0]) return emailParts[0];
       }
       
       // Fallback to default
@@ -35,16 +44,38 @@ export const extractUserInfo = (user: SupabaseUser): User => {
   const getProfilePicture = () => {
     try {
       if (user.user_metadata) {
-        if (user.user_metadata.avatar_url) return user.user_metadata.avatar_url;
-        if (user.user_metadata.picture) return user.user_metadata.picture;
+        if (typeof user.user_metadata.avatar_url === 'string' && user.user_metadata.avatar_url) 
+          return user.user_metadata.avatar_url;
+        
+        if (typeof user.user_metadata.picture === 'string' && user.user_metadata.picture) 
+          return user.user_metadata.picture;
       }
       
       // Create a UI Avatars URL with fallback to "User" if name extraction fails
       const name = getName();
+      if (!name || typeof name !== 'string') {
+        return `https://ui-avatars.com/api/?name=User&background=random`;
+      }
       return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`;
     } catch (error) {
       console.error("Error extracting profile picture:", error);
       return `https://ui-avatars.com/api/?name=User&background=random`;
+    }
+  };
+  
+  // Get role with proper fallback
+  const getRole = () => {
+    try {
+      if (user.user_metadata && user.user_metadata.role) {
+        const role = user.user_metadata.role;
+        if (role === "performer" || role === "choreographer") {
+          return role;
+        }
+      }
+      return "performer"; // Default role
+    } catch (error) {
+      console.error("Error extracting user role:", error);
+      return "performer";
     }
   };
   
@@ -53,7 +84,7 @@ export const extractUserInfo = (user: SupabaseUser): User => {
     name: getName(),
     email: user.email || "",
     profilePicture: getProfilePicture(),
-    role: (user.user_metadata && user.user_metadata.role) || "performer"
+    role: getRole()
   };
   
   console.log("User info extracted:", userInfo);

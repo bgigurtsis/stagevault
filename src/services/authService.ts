@@ -53,6 +53,7 @@ export class AuthService {
    */
   async loginWithGoogle(): Promise<void> {
     try {
+      // Get the current URL for proper redirect handling
       const currentUrl = window.location.origin;
       const redirectTo = `${currentUrl}/login`;
       
@@ -64,7 +65,7 @@ export class AuthService {
       const { data: sessionData } = await supabase.auth.getSession();
       console.log("Current session before Google login:", sessionData);
       
-      // Detailed scopes logging
+      // Define the scopes we need - being explicit here helps with debugging
       const scopes = [
         "https://www.googleapis.com/auth/userinfo.email",
         "https://www.googleapis.com/auth/userinfo.profile",
@@ -75,6 +76,7 @@ export class AuthService {
       console.log("Requesting the following scopes:", scopes);
       console.log("Scope string:", scopes.join(" "));
       
+      // Initiate the OAuth flow with the properly configured options
       const { error, data } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -87,6 +89,7 @@ export class AuthService {
         }
       });
       
+      // Handle any errors that occur during OAuth initialization
       if (error) {
         console.error("=== Google OAuth Error ===");
         console.error("Error object:", error);
@@ -105,6 +108,7 @@ export class AuthService {
     } catch (error) {
       console.error("=== Google OAuth Exception ===");
       console.error("Exception type:", error.constructor.name);
+      console.error("Exception details:", error);
       console.error("Error message:", error.message);
       console.error("Error stack:", error.stack);
       throw error;

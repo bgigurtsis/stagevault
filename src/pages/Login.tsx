@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuthContext";
@@ -41,109 +42,155 @@ export default function Login() {
       password: ""
     }
   });
+  
   console.log("=== Login Component Rendered ===");
   console.log("isAuthenticated:", isAuthenticated);
 
+  // Handle OAuth redirect and hash parameters
   useEffect(() => {
-    const parseHashParams = (hash: string) => {
-      const params = new URLSearchParams(hash.substring(1));
-      const result: Record<string, string> = {};
-      for (const [key, value] of params.entries()) {
-        result[key] = value;
-      }
-      return result;
-    };
-
-    const hash = window.location.hash;
-    console.log("=== Checking URL hash for auth tokens ===");
-    console.log("Hash exists:", !!hash);
-    if (hash) {
-      console.log("Full hash string:", hash);
-
-      const hashParams = parseHashParams(hash);
-      console.log("Parsed hash parameters:", hashParams);
-      if (hashParams.access_token) {
-        console.log("=== Access token found in hash ===");
-        console.log("Access token (first 20 chars):", hashParams.access_token.substring(0, 20) + "...");
-        console.log("Token type:", hashParams.token_type);
-        console.log("Expires in:", hashParams.expires_in);
-        console.log("Refresh token exists:", !!hashParams.refresh_token);
-
-        if (hashParams.provider_token) {
-          console.log("Provider token exists (first 20 chars):", hashParams.provider_token.substring(0, 20) + "...");
-        } else {
-          console.warn("No provider_token in hash! This is needed for Google Drive access");
-          console.log("Requested scopes may not have been granted");
+    try {
+      const parseHashParams = (hash: string) => {
+        if (!hash || typeof hash !== 'string') {
+          console.log("No hash or invalid hash format");
+          return {};
         }
-        if (hashParams.access_token && hashParams.refresh_token) {
-          console.log("Attempting to set session from hash parameters");
+        
+        try {
+          const params = new URLSearchParams(hash.substring(1));
+          const result: Record<string, string> = {};
+          for (const [key, value] of params.entries()) {
+            result[key] = value;
+          }
+          return result;
+        } catch (error) {
+          console.error("Error parsing hash params:", error);
+          return {};
+        }
+      };
 
-          supabase.auth.setSession({
-            access_token: hashParams.access_token,
-            refresh_token: hashParams.refresh_token
-          }).then(({
-            data,
-            error
-          }) => {
-            if (error) {
-              console.error("=== Error setting session ===");
-              console.error("Error object:", error);
-              console.error("Error message:", error.message);
-              console.error("Error status:", error.status);
-              toast({
-                title: "Authentication error",
-                description: "Failed to complete login. Please try again.",
-                variant: "destructive"
-              });
-            } else {
-              console.log("=== Session set successfully ===");
-              console.log("Session exists:", !!data.session);
-              if (data.session) {
-                console.log("User ID:", data.session.user.id);
-                console.log("Session expires at:", new Date(data.session.expires_at * 1000).toISOString());
-                console.log("Provider token exists:", !!data.session.provider_token);
-                if (data.session.provider_token) {
-                  console.log("Provider token (first 20 chars):", data.session.provider_token.substring(0, 20) + "...");
+      const hash = window.location.hash;
+      console.log("=== Checking URL hash for auth tokens ===");
+      console.log("Hash exists:", !!hash);
+      
+      if (hash) {
+        console.log("Full hash string:", hash);
+
+        const hashParams = parseHashParams(hash);
+        console.log("Parsed hash parameters:", hashParams);
+        
+        if (hashParams.access_token) {
+          console.log("=== Access token found in hash ===");
+          console.log("Access token (first 20 chars):", hashParams.access_token.substring(0, 20) + "...");
+          console.log("Token type:", hashParams.token_type);
+          console.log("Expires in:", hashParams.expires_in);
+          console.log("Refresh token exists:", !!hashParams.refresh_token);
+
+          if (hashParams.provider_token) {
+            console.log("Provider token exists (first 20 chars):", hashParams.provider_token.substring(0, 20) + "...");
+          } else {
+            console.warn("No provider_token in hash! This is needed for Google Drive access");
+            console.log("Requested scopes may not have been granted");
+          }
+          
+          if (hashParams.access_token && hashParams.refresh_token) {
+            console.log("Attempting to set session from hash parameters");
+            
+            // Add a small delay to ensure the auth system is ready
+            setTimeout(() => {
+              supabase.auth.setSession({
+                access_token: hashParams.access_token,
+                refresh_token: hashParams.refresh_token
+              }).then(({
+                data,
+                error
+              }) => {
+                if (error) {
+                  console.error("=== Error setting session ===");
+                  console.error("Error object:", error);
+                  console.error("Error message:", error.message);
+                  console.error("Error status:", error.status);
+                  toast({
+                    title: "Authentication error",
+                    description: "Failed to complete login. Please try again.",
+                    variant: "destructive"
+                  });
                 } else {
-                  console.warn("No provider token in session - Google Drive API won't work!");
+                  console.log("=== Session set successfully ===");
+                  console.log("Session exists:", !!data.session);
+                  if (data.session) {
+                    console.log("User ID:", data.session.user.id);
+                    console.log("Session expires at:", new Date(data.session.expires_at * 1000).toISOString());
+                    console.log("Provider token exists:", !!data.session.provider_token);
+                    
+                    if (data.session.provider_token) {
+                      console.log("Provider token (first 20 chars):", data.session.provider_token.substring(0, 20) + "...");
+                    } else {
+                      console.warn("No provider token in session - Google Drive API won't work!");
+                    }
+                    
+                    console.log("User authenticated, redirecting to home page");
+                    
+                    // Ensure state is updated before redirecting
+                    setTimeout(() => {
+                      navigate("/");
+                      toast({
+                        title: "Welcome back!",
+                        description: "You have successfully logged in."
+                      });
+                    }, 100);
+                  }
                 }
-                console.log("User authenticated, redirecting to home page");
-                navigate("/");
+              }).catch(err => {
+                console.error("Critical error setting session:", err);
                 toast({
-                  title: "Welcome back!",
-                  description: "You have successfully logged in."
+                  title: "Authentication error",
+                  description: "A critical error occurred. Please try logging in again.",
+                  variant: "destructive"
                 });
-              }
-            }
-          });
+              });
+            }, 100);
+          }
+
+          // Clear the hash from the URL to avoid auth parameters being visible
+          try {
+            window.history.replaceState(null, document.title, window.location.pathname);
+            console.log("URL hash cleared");
+          } catch (error) {
+            console.error("Error clearing URL hash:", error);
+          }
         }
-
-        window.history.replaceState(null, document.title, window.location.pathname);
-        console.log("URL hash cleared");
       }
-    }
 
-    console.log("Current path:", window.location.pathname);
-    console.log("Current full URL:", window.location.href);
+      console.log("Current path:", window.location.pathname);
+      console.log("Current full URL:", window.location.href);
+    } catch (error) {
+      console.error("Critical error in hash handling:", error);
+    }
   }, [navigate, toast]);
 
+  // Normal auth check and redirect
   useEffect(() => {
-    console.log("=== Login - auth status check useEffect ===");
-    console.log("isAuthenticated:", isAuthenticated);
-    if (isAuthenticated) {
-      console.log("User is authenticated, redirecting to home page");
-      navigate("/");
-      toast({
-        title: "Welcome back!",
-        description: "You have successfully logged in."
-      });
+    try {
+      console.log("=== Login - auth status check useEffect ===");
+      console.log("isAuthenticated:", isAuthenticated);
+      if (isAuthenticated) {
+        console.log("User is authenticated, redirecting to home page");
+        navigate("/");
+        toast({
+          title: "Welcome back!",
+          description: "You have successfully logged in."
+        });
+      }
+    } catch (error) {
+      console.error("Error in auth status check:", error);
     }
   }, [isAuthenticated, navigate, toast]);
 
+  // Google login handler
   const handleGoogleLogin = async () => {
-    console.log("=== Google login button clicked ===");
-    setLoading(true);
     try {
+      console.log("=== Google login button clicked ===");
+      setLoading(true);
       console.log("Calling loginWithGoogle function");
       await loginWithGoogle();
       console.log("loginWithGoogle function completed - redirect should happen via OAuth");
@@ -161,10 +208,12 @@ export default function Login() {
     }
   };
 
+  // Form submission handler
   const onSubmit = async (values: LoginFormValues) => {
-    console.log("=== Email/password login form submitted ===");
-    setLoading(true);
     try {
+      console.log("=== Email/password login form submitted ===");
+      setLoading(true);
+      
       const {
         data,
         error
@@ -172,15 +221,18 @@ export default function Login() {
         email: values.email,
         password: values.password
       });
+      
       if (error) {
         console.error("=== Login failed ===");
         console.error("Error object:", error);
         console.error("Error message:", error.message);
         throw error;
       }
+      
       console.log("=== Login successful ===");
       console.log("User:", data.user);
       console.log("Session:", data.session);
+      
       navigate("/");
       toast({
         title: "Welcome back!",

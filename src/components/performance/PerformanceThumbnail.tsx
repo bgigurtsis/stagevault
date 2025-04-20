@@ -12,35 +12,50 @@ interface PerformanceThumbnailProps {
 }
 
 export const PerformanceThumbnail: React.FC<PerformanceThumbnailProps> = ({ 
-  title = "", // Provide default empty string for title
+  title = "", 
   className = "",
-  performanceId,
+  performanceId = "",
   fallbackIcon = false,
   patternType
 }) => {
-  // Ensure both title and performanceId are strings or empty strings (never undefined)
-  const safeTitle = title || "";
-  const safePerformanceId = performanceId || "";
+  // Ensure safe strings for all inputs
+  const safeTitle = (typeof title === 'string') ? title : "";
+  const safePerformanceId = (typeof performanceId === 'string') ? performanceId : "";
   
   // Create a valid pattern seed that will always be a string
-  const patternSeed = safePerformanceId 
-    ? `${safeTitle}-${safePerformanceId}` 
-    : safeTitle || "default-pattern";
+  const patternSeed = useMemo(() => {
+    try {
+      if (safePerformanceId.length > 0) {
+        return `${safeTitle}-${safePerformanceId}`;
+      }
+      return safeTitle.length > 0 ? safeTitle : "default-pattern";
+    } catch (error) {
+      console.error("Error creating pattern seed:", error);
+      return "default-pattern";
+    }
+  }, [safeTitle, safePerformanceId]);
 
   // Select a pattern type to use
   const selectedPatternType = useMemo(() => {
-    if (!patternType) {
-      return "chevrons"; // Use a specific default
+    try {
+      if (!patternType) {
+        return "chevrons"; // Use a specific default
+      }
+      
+      if (Array.isArray(patternType)) {
+        // If it's an array, use a deterministic selection based on patternSeed
+        if (patternType.length === 0) return "chevrons";
+        
+        const combinedHash = Array.from(patternSeed).reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        return patternType[Math.abs(combinedHash) % patternType.length];
+      }
+      
+      // If it's a single pattern type, use it
+      return patternType;
+    } catch (error) {
+      console.error("Error selecting pattern type:", error);
+      return "chevrons";
     }
-    
-    if (Array.isArray(patternType)) {
-      // If it's an array, use a deterministic selection based on patternSeed
-      const combinedHash = Array.from(patternSeed || "").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-      return patternType[Math.abs(combinedHash) % patternType.length];
-    }
-    
-    // If it's a single pattern type, use it
-    return patternType;
   }, [patternType, patternSeed]);
 
   // Generate a fixed color with variations based on the seed
@@ -56,8 +71,12 @@ export const PerformanceThumbnail: React.FC<PerformanceThumbnailProps> = ({
     ];
     
     try {
-      // Get a hash based on the pattern seed but handle case where patternSeed is undefined
-      const idHash = Array.from(patternSeed || "").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+      // Get a hash based on the pattern seed
+      if (!patternSeed || typeof patternSeed !== 'string' || patternSeed.length === 0) {
+        return baseOrangeColors[0];
+      }
+      
+      const idHash = Array.from(patternSeed).reduce((acc, char) => acc + char.charCodeAt(0), 0);
       
       // Use the hash to select a predefined color
       return baseOrangeColors[Math.abs(idHash) % baseOrangeColors.length];
@@ -74,38 +93,64 @@ export const PerformanceThumbnail: React.FC<PerformanceThumbnailProps> = ({
       // Use explicit color and pattern type
       const color = getColorVariation();
       
-      // Make sure we pass valid parameters
+      // Make sure we have valid parameters
       if (!patternSeed || !color || !selectedPatternType) {
         throw new Error("Invalid pattern parameters");
       }
       
-      const pattern = GeoPattern.generate(patternSeed, {
-        baseColor: color,
-        generator: selectedPatternType
-      });
-      return pattern.toDataUrl();
+      // Double-check that all inputs are strings
+      if (typeof patternSeed !== 'string' || typeof color !== 'string' || 
+          typeof selectedPatternType !== 'string') {
+        throw new Error("Pattern parameters must be strings");
+      }
+      
+      try {
+        const pattern = GeoPattern.generate(patternSeed, {
+          baseColor: color,
+          generator: selectedPatternType
+        });
+        return pattern.toDataUrl();
+      } catch (geoError) {
+        console.error('GeoPattern generation error:', geoError);
+        throw geoError;
+      }
     } catch (error) {
       console.error('Error generating pattern:', error);
-      // Fallback to a simple gradient
+      // Fallback to a simple gradient that won't fail
       return `linear-gradient(135deg, #f59e0b, #f97316)`;
     }
   }, [patternSeed, selectedPatternType]);
   
-  return (
-    <div 
-      className={cn(
-        "aspect-video bg-muted flex items-center justify-center relative overflow-hidden",
-        className
-      )}
-      aria-label={`Thumbnail for ${safeTitle}`}
-    >
+  // Render with defensive coding to prevent any undefined values
+  try {
+    return (
       <div 
-        className="absolute inset-0 w-full h-full"
-        style={{ 
-          backgroundImage,
-          backgroundSize: 'cover'
-        }}
+        className={cn(
+          "aspect-video bg-muted flex items-center justify-center relative overflow-hidden",
+          className
+        )}
+        aria-label={`Thumbnail for ${safeTitle || "performance"}`}
+      >
+        <div 
+          className="absolute inset-0 w-full h-full"
+          style={{ 
+            backgroundImage,
+            backgroundSize: 'cover'
+          }}
+        />
+      </div>
+    );
+  } catch (renderError) {
+    console.error("Error rendering PerformanceThumbnail:", renderError);
+    // Ultimate fallback - just render a colored div if everything else fails
+    return (
+      <div 
+        className={cn(
+          "aspect-video bg-orange-500 flex items-center justify-center relative overflow-hidden",
+          className
+        )}
+        aria-label="Performance thumbnail (fallback)"
       />
-    </div>
-  );
+    );
+  }
 };
