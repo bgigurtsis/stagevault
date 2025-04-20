@@ -55,10 +55,13 @@ export class AuthService {
     try {
       // Get the current URL for proper redirect handling
       const currentUrl = window.location.origin;
-      const redirectTo = `${currentUrl}/login`;
+      const hostname = window.location.hostname;
+      let redirectTo = `${currentUrl}/login`;
       
+      // Add more logging for debugging
       console.log("=== Google OAuth Flow Initiated ===");
       console.log("Current URL:", currentUrl);
+      console.log("Current hostname:", hostname);
       console.log("Redirect URL:", redirectTo);
       
       // Log the current session before attempting login
@@ -95,6 +98,7 @@ export class AuthService {
         console.error("Error object:", error);
         console.error("Error message:", error.message);
         console.error("Error status:", error.status);
+        console.error("Full error:", JSON.stringify(error, null, 2));
         throw error;
       }
       
@@ -111,6 +115,7 @@ export class AuthService {
       console.error("Exception details:", error);
       console.error("Error message:", error.message);
       console.error("Error stack:", error.stack);
+      console.error("Full error:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
       throw error;
     }
   }
