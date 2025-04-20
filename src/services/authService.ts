@@ -63,6 +63,8 @@ export class AuthService {
       console.log("Current URL:", currentUrl);
       console.log("Current hostname:", hostname);
       console.log("Redirect URL:", redirectTo);
+      console.log("User agent:", navigator.userAgent);
+      console.log("Window dimensions:", { width: window.innerWidth, height: window.innerHeight });
       
       // Log the current session before attempting login
       const { data: sessionData } = await supabase.auth.getSession();

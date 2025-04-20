@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuthContext";
 import { Button } from "@/components/ui/button";
@@ -12,19 +11,23 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 // Define an error boundary component for catching render errors
-class ErrorBoundary extends React.Component {
-  constructor(props) {
+class LoginErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null; errorInfo: React.ErrorInfo | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
     super(props);
     this.state = { hasError: false, error: null, errorInfo: null };
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error, errorInfo) {
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("Login page error boundary caught error:", error);
     console.error("Error details:", errorInfo);
     this.setState({ errorInfo });
@@ -97,8 +100,8 @@ export default function Login() {
   console.log("Current URL:", window.location.href);
   console.log("Has hash:", !!window.location.hash);
   console.log("Debug state:", debugState);
+  console.log("Login component rendered", { isAuthenticated, window: window.location.href });
 
-  // Handle OAuth redirect and hash parameters
   useEffect(() => {
     try {
       console.log("=== OAuth Redirect Handler useEffect Started ===");
@@ -154,7 +157,6 @@ export default function Login() {
             setDebugState(prev => ({ ...prev, authStage: "setting_session" }));
             console.log("Attempting to set session from hash parameters");
             
-            // Add a small delay to ensure the auth system is ready
             setTimeout(() => {
               try {
                 console.log("Starting setSession with tokens");
@@ -194,7 +196,6 @@ export default function Login() {
                       
                       console.log("User authenticated, preparing to redirect to home page");
                       
-                      // Ensure state is updated before redirecting
                       setTimeout(() => {
                         setDebugState(prev => ({ ...prev, authStage: "redirecting" }));
                         console.log("Redirecting to home now");
@@ -226,7 +227,6 @@ export default function Login() {
             }, 300);
           }
 
-          // Clear the hash from the URL to avoid auth parameters being visible
           try {
             window.history.replaceState(null, document.title, window.location.pathname);
             console.log("URL hash cleared");
@@ -246,7 +246,6 @@ export default function Login() {
     }
   }, [navigate, toast]);
 
-  // Normal auth check and redirect
   useEffect(() => {
     try {
       console.log("=== Login - auth status check useEffect ===");
@@ -267,7 +266,6 @@ export default function Login() {
     }
   }, [isAuthenticated, navigate, toast]);
 
-  // Google login handler
   const handleGoogleLogin = async () => {
     try {
       console.log("=== Google login button clicked ===");
@@ -295,7 +293,6 @@ export default function Login() {
     }
   };
 
-  // Form submission handler
   const onSubmit = async (values: LoginFormValues) => {
     try {
       console.log("=== Email/password login form submitted ===");
@@ -341,7 +338,7 @@ export default function Login() {
   };
 
   return (
-    <ErrorBoundary>
+    <LoginErrorBoundary>
       <div className="min-h-screen flex flex-col items-center justify-center bg-muted/40 p-4">
         <div className="mb-8 flex flex-col items-center">
           <div className="rounded-xl bg-stage-orange p-2 mb-4">
@@ -442,6 +439,6 @@ export default function Login() {
           </div>
         )}
       </div>
-    </ErrorBoundary>
+    </LoginErrorBoundary>
   );
 }

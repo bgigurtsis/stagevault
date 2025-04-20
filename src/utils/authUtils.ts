@@ -6,51 +6,56 @@ import { User } from "@/contexts/types";
  * Extract user information from Supabase user object
  * Implemented with thorough error handling to avoid undefined values
  */
-export const extractUserInfo = (user: SupabaseUser): User => {
+export const extractUserInfo = (user: SupabaseUser | null | undefined): User => {
+  // Added additional null check at the beginning
   if (!user) {
-    console.error("Cannot extract user info: user object is undefined");
+    console.error("Cannot extract user info: user object is undefined or null");
     throw new Error("Invalid user object");
   }
   
   console.log("Extracting user info for user:", user.id);
-  console.log("Full user object:", JSON.stringify(user, null, 2));
+  const safeUser = { ...user }; // Create a safe copy to work with
+  
+  try {
+    console.log("Full user object:", JSON.stringify(safeUser, null, 2));
+  } catch (error) {
+    console.error("Error stringifying user object:", error);
+    console.log("User object cannot be stringified, attempting to log properties individually");
+    console.log("User ID:", safeUser.id);
+    console.log("User email:", safeUser.email);
+    console.log("User metadata exists:", !!safeUser.user_metadata);
+  }
   
   // Safely get name, ensuring we always have a string even if metadata is incomplete
   const getName = () => {
     try {
       // Check if user metadata exists and contains name information
-      if (user.user_metadata) {
-        console.log("User metadata available:", JSON.stringify(user.user_metadata, null, 2));
+      if (safeUser.user_metadata) {
+        console.log("User metadata available:", JSON.stringify(safeUser.user_metadata, null, 2));
         
-        if (typeof user.user_metadata.name === 'string' && user.user_metadata.name) {
-          console.log("Using name from user_metadata.name:", user.user_metadata.name);
-          return user.user_metadata.name;
+        if (typeof safeUser.user_metadata.name === 'string' && safeUser.user_metadata.name) {
+          console.log("Using name from user_metadata.name:", safeUser.user_metadata.name);
+          return safeUser.user_metadata.name;
         }
         
-        if (typeof user.user_metadata.full_name === 'string' && user.user_metadata.full_name) {
-          console.log("Using name from user_metadata.full_name:", user.user_metadata.full_name);
-          return user.user_metadata.full_name;
-        }
-        
-        // Google specific fields
-        if (typeof user.user_metadata.full_name === 'string' && user.user_metadata.full_name) {
-          console.log("Using name from user_metadata.full_name:", user.user_metadata.full_name);
-          return user.user_metadata.full_name;
+        if (typeof safeUser.user_metadata.full_name === 'string' && safeUser.user_metadata.full_name) {
+          console.log("Using name from user_metadata.full_name:", safeUser.user_metadata.full_name);
+          return safeUser.user_metadata.full_name;
         }
       }
       
       // If no name in metadata, try to extract from email
-      if (user.email && typeof user.email === 'string') {
-        console.log("No name in metadata, extracting from email:", user.email);
+      if (safeUser.email && typeof safeUser.email === 'string') {
+        console.log("No name in metadata, extracting from email:", safeUser.email);
         try {
-          const emailParts = user.email.split('@');
+          const emailParts = safeUser.email.split('@');
           if (emailParts[0]) {
             console.log("Using name from email:", emailParts[0]);
             return emailParts[0];
           }
         } catch (error) {
           console.error("Error extracting name from email:", error);
-          console.error("Email that caused error:", user.email);
+          console.error("Email that caused error:", safeUser.email);
         }
       }
       
@@ -59,7 +64,11 @@ export const extractUserInfo = (user: SupabaseUser): User => {
       return "User";
     } catch (error) {
       console.error("Error extracting user name:", error);
-      console.error("User object that caused error:", JSON.stringify(user, null, 2));
+      try {
+        console.error("User object that caused error:", JSON.stringify(safeUser, null, 2));
+      } catch (jsonError) {
+        console.error("Could not stringify user object:", jsonError);
+      }
       return "User";
     }
   };
@@ -67,17 +76,17 @@ export const extractUserInfo = (user: SupabaseUser): User => {
   // Safely get profile picture URL
   const getProfilePicture = () => {
     try {
-      if (user.user_metadata) {
+      if (safeUser.user_metadata) {
         console.log("Checking user_metadata for profile picture");
         
-        if (typeof user.user_metadata.avatar_url === 'string' && user.user_metadata.avatar_url) {
-          console.log("Using avatar_url from metadata:", user.user_metadata.avatar_url);
-          return user.user_metadata.avatar_url;
+        if (typeof safeUser.user_metadata.avatar_url === 'string' && safeUser.user_metadata.avatar_url) {
+          console.log("Using avatar_url from metadata:", safeUser.user_metadata.avatar_url);
+          return safeUser.user_metadata.avatar_url;
         }
         
-        if (typeof user.user_metadata.picture === 'string' && user.user_metadata.picture) {
-          console.log("Using picture from metadata:", user.user_metadata.picture);
-          return user.user_metadata.picture;
+        if (typeof safeUser.user_metadata.picture === 'string' && safeUser.user_metadata.picture) {
+          console.log("Using picture from metadata:", safeUser.user_metadata.picture);
+          return safeUser.user_metadata.picture;
         }
       }
       
@@ -100,7 +109,11 @@ export const extractUserInfo = (user: SupabaseUser): User => {
       return avatarUrl;
     } catch (error) {
       console.error("Error extracting profile picture:", error);
-      console.error("User object that caused error:", JSON.stringify(user, null, 2));
+      try {
+        console.error("User object that caused error:", JSON.stringify(safeUser, null, 2));
+      } catch (jsonError) {
+        console.error("Could not stringify user object:", jsonError);
+      }
       return `https://ui-avatars.com/api/?name=User&background=random`;
     }
   };
@@ -108,8 +121,8 @@ export const extractUserInfo = (user: SupabaseUser): User => {
   // Get role with proper fallback
   const getRole = () => {
     try {
-      if (user.user_metadata && user.user_metadata.role) {
-        const role = user.user_metadata.role;
+      if (safeUser.user_metadata && safeUser.user_metadata.role) {
+        const role = safeUser.user_metadata.role;
         console.log("Role from metadata:", role);
         if (role === "performer" || role === "choreographer") {
           return role;
@@ -129,24 +142,28 @@ export const extractUserInfo = (user: SupabaseUser): User => {
     const userRole = getRole();
     
     const userInfo = {
-      id: user.id,
+      id: safeUser.id,
       name: userName,
-      email: user.email || "",
+      email: safeUser.email || "",
       profilePicture: profilePic,
-      role: userRole
+      role: userRole as "performer" | "choreographer"  // Add type assertion for clarity
     };
     
     console.log("User info extracted:", userInfo);
     return userInfo;
   } catch (error) {
     console.error("Fatal error in extractUserInfo:", error);
-    console.error("User object that caused error:", JSON.stringify(user, null, 2));
+    try {
+      console.error("User object that caused error:", JSON.stringify(safeUser, null, 2));
+    } catch (jsonError) {
+      console.error("Could not stringify user object:", jsonError);
+    }
     
     // Create an emergency fallback user to prevent app crash
     const fallbackUser = {
-      id: user.id,
+      id: safeUser.id,
       name: "User",
-      email: user.email || "",
+      email: safeUser.email || "",
       profilePicture: `https://ui-avatars.com/api/?name=User&background=random`,
       role: "performer" as "performer" | "choreographer"
     };

@@ -3,6 +3,7 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 // Add robust error boundary to catch any rendering errors
 try {
@@ -142,20 +143,14 @@ function ErrorLogger({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <React.ErrorBoundary
-      fallback={({ error }) => {
+    <ErrorBoundary
+      fallback={({ error, resetError }) => {
         console.error("Error caught by ErrorBoundary:", error);
         return displayErrorUI(error);
       }}
-      onError={(error, errorInfo) => {
-        console.error("Error caught by ErrorBoundary:", error);
-        console.error("Error Info:", errorInfo);
-        setError(error);
-        setHasError(true);
-      }}
     >
       {children}
-    </React.ErrorBoundary>
+    </ErrorBoundary>
   );
 }
 
