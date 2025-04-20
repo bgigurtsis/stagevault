@@ -7,14 +7,55 @@ import { User } from "@/contexts/types";
  */
 export const extractUserInfo = (user: SupabaseUser): User => {
   console.log("Extracting user info for user:", user.id);
+  
+  // Safely get name, ensuring we always have a string even if metadata is incomplete
+  const getName = () => {
+    try {
+      // Check if user metadata exists and contains name information
+      if (user.user_metadata) {
+        if (user.user_metadata.name) return user.user_metadata.name;
+        if (user.user_metadata.full_name) return user.user_metadata.full_name;
+      }
+      
+      // If no name in metadata, try to extract from email
+      if (user.email) {
+        const emailParts = user.email.split('@');
+        return emailParts[0] || "User";
+      }
+      
+      // Fallback to default
+      return "User";
+    } catch (error) {
+      console.error("Error extracting user name:", error);
+      return "User";
+    }
+  };
+  
+  // Safely get profile picture URL
+  const getProfilePicture = () => {
+    try {
+      if (user.user_metadata) {
+        if (user.user_metadata.avatar_url) return user.user_metadata.avatar_url;
+        if (user.user_metadata.picture) return user.user_metadata.picture;
+      }
+      
+      // Create a UI Avatars URL with fallback to "User" if name extraction fails
+      const name = getName();
+      return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`;
+    } catch (error) {
+      console.error("Error extracting profile picture:", error);
+      return `https://ui-avatars.com/api/?name=User&background=random`;
+    }
+  };
+  
   const userInfo = {
     id: user.id,
-    name: user.user_metadata.name || user.user_metadata.full_name || user.email?.split("@")[0] || "User",
+    name: getName(),
     email: user.email || "",
-    profilePicture: user.user_metadata.avatar_url || user.user_metadata.picture || 
-      `https://ui-avatars.com/api/?name=${encodeURIComponent(user.user_metadata.name || user.email?.split("@")[0] || "User")}&background=random`,
-    role: user.user_metadata.role || "performer"
+    profilePicture: getProfilePicture(),
+    role: (user.user_metadata && user.user_metadata.role) || "performer"
   };
+  
   console.log("User info extracted:", userInfo);
   return userInfo;
 };

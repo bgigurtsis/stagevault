@@ -35,8 +35,8 @@ export const PerformanceThumbnail: React.FC<PerformanceThumbnailProps> = ({
     
     if (Array.isArray(patternType)) {
       // If it's an array, use a deterministic selection based on patternSeed
-      const combinedHash = patternSeed.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-      return patternType[combinedHash % patternType.length];
+      const combinedHash = Array.from(patternSeed || "").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+      return patternType[Math.abs(combinedHash) % patternType.length];
     }
     
     // If it's a single pattern type, use it
@@ -55,11 +55,17 @@ export const PerformanceThumbnail: React.FC<PerformanceThumbnailProps> = ({
       "#fbbf24"  // amber-400
     ];
     
-    // Get a hash based on the pattern seed
-    const idHash = patternSeed.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    
-    // Use the hash to select a predefined color
-    return baseOrangeColors[Math.abs(idHash) % baseOrangeColors.length];
+    try {
+      // Get a hash based on the pattern seed but handle case where patternSeed is undefined
+      const idHash = Array.from(patternSeed || "").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+      
+      // Use the hash to select a predefined color
+      return baseOrangeColors[Math.abs(idHash) % baseOrangeColors.length];
+    } catch (error) {
+      console.error('Error getting color variation:', error);
+      // Return a default color if anything goes wrong
+      return "#f97316";
+    }
   };
   
   // Generate background with robust error handling
